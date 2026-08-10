@@ -657,11 +657,18 @@ function renderQRs() {
     el.innerHTML = '';
     new QRCode(el, {
       text: data,
-      width: 150,
-      height: 150,
+      width: 500,
+      height: 500,
       colorDark: '#2a2118',
-      colorLight: '#ffffff'
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
     });
+    // Mostrarlo chico en pantalla aunque el archivo real sea de alta resolución
+    const img = el.querySelector('canvas, img');
+    if (img) {
+      img.style.width = '150px';
+      img.style.height = '150px';
+    }
     el.dataset.rendered = '1';
   });
 }
@@ -962,6 +969,12 @@ async function startCamera() {
       video: {
         facingMode: {
           ideal: 'environment'
+        },
+        width: {
+          ideal: 1920
+        },
+        height: {
+          ideal: 1080
         }
       }
     });
@@ -1011,7 +1024,9 @@ function scanLoop() {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(img.data, img.width, img.height);
+    const code = jsQR(img.data, img.width, img.height, {
+      inversionAttempts: 'attemptBoth'
+    });
     if (code && code.data) {
       handleScanResult(code.data);
       return;
