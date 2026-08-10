@@ -317,9 +317,10 @@ function toggleAccordion(bodyId, group) {
   const body = document.getElementById(bodyId);
   const header = document.querySelector('.acc-header[data-target="' + bodyId + '"][data-group="' + group + '"]');
   const wasOpen = body.classList.contains('show');
-  document.querySelectorAll('.acc-body[data-group="' + group + '"]').forEach(el => el.classList.remove('show'));
-  document.querySelectorAll('.acc-header[data-group="' + group + '"]').forEach(el => el.classList.remove('open'));
-  if (!wasOpen) {
+  if (wasOpen) {
+    body.classList.remove('show');
+    header.classList.remove('open');
+  } else {
     body.classList.add('show');
     header.classList.add('open');
   }
@@ -342,6 +343,15 @@ function irATab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelectorAll('.drawer-item').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   closeDrawer();
+
+  // Al entrar a la pestaña, refrescar con los datos realmente guardados
+  // (descarta cualquier texto escrito pero no guardado).
+  if (name === 'precios') renderPrecios();
+  else if (name === 'stock') renderStock();
+  else if (name === 'ventas') renderVentas();
+  else if (name === 'remis') renderRemis();
+  else if (name === 'resumen') renderResumen();
+  else if (name === 'vender') renderVender();
 }
 
 /* ================= RENDER ================= */
@@ -941,18 +951,46 @@ function cerrarScanner() {
 async function startCamera() {
   stopCamera();
   const video = document.getElementById('scanner-video');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    document.getElementById('scan-status').textContent = 'Este navegador no permite acceso a la cámara acá. Probá con Chrome actualizado.';
+    return;
+  }
+
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: 'environment'
+        facingMode: {
+          ideal: 'environment'
+        }
       }
     });
-    video.srcObject = scannerStream;
-    await video.play();
-    scanLoop();
-  } catch (e) {
-    document.getElementById('scan-status').textContent = 'No se pudo acceder a la cámara. Usá la selección manual en la pantalla.';
+  } catch (e1) {
+    // Reintentar sin pedir específicamente la cámara trasera
+    try {
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: true
+      });
+    } catch (e2) {
+      let motivo = e2.name || 'desconocido';
+      let msg = 'No se pudo acceder a la cámara (' + motivo + ').';
+      if (motivo === 'NotAllowedError') msg = 'El navegador bloqueó la cámara. Revisá los permisos y volvé a intentar.';
+      else if (motivo === 'NotReadableError') msg = 'La cámara está siendo usada por otra app. Cerrá otras apps que la usen (video llamadas, otra pestaña) y volvé a intentar.';
+      else if (motivo === 'NotFoundError') msg = 'No se encontró ninguna cámara en este dispositivo.';
+      document.getElementById('scan-status').textContent = msg + ' Podés usar la selección manual en la pantalla.';
+      return;
+    }
   }
+
+  video.srcObject = scannerStream;
+  try {
+    await video.play();
+  } catch (e3) {
+    // Algunos navegadores rechazan play() aunque el video ya esté mostrando imagen
+    // (por ejemplo, con muted+playsinline suele arrancar solo). No cortamos acá:
+    // seguimos e intentamos escanear igual.
+  }
+  scanLoop();
 }
 
 function stopCamera() {
