@@ -280,6 +280,25 @@ function fmtMoney(n) {
   });
 }
 
+// Muestra docenas de forma compacta: 17.5 -> "17 ½", 0.5 -> "½", 17 -> "17"
+function fmtDocenasCorto(qty) {
+  qty = Number(qty) || 0;
+  const entero = Math.floor(qty);
+  const media = (qty - entero) >= 0.49;
+  if (entero === 0 && media) return '½';
+  return entero + (media ? ' ½' : '');
+}
+
+// Muestra docenas en palabras: 17.5 -> "17 docenas y media", 0.5 -> "media docena"
+function fmtDocenasLargo(qty) {
+  qty = Number(qty) || 0;
+  const entero = Math.floor(qty);
+  const media = (qty - entero) >= 0.49;
+  if (entero === 0 && media) return 'media docena';
+  const base = entero + (entero === 1 ? ' docena' : ' docenas');
+  return media ? base + ' y media' : base;
+}
+
 function formatMiles(el) {
   const digits = el.value.replace(/\D/g, '');
   el.value = digits ? Number(digits).toLocaleString('es-AR') : '';
@@ -386,10 +405,11 @@ function renderStock() {
     const p = PRODUCTS[prod];
     const val = STATE.stock[prod] || 0;
     const low = (p.unit === 'docenas' && val < 1) || (p.unit === 'unidades' && val < 3);
+    const valMostrar = p.unit === 'docenas' ? fmtDocenasCorto(val) : val;
     html += `<div class="prod-row" style="cursor:pointer;" onclick="abrirEditarStock('${prod}')">
       <div class="prod-icon">${icon(prod)}</div>
       <div style="flex:1;"><div class="prod-name">${p.label}</div><div class="unit-tag">${p.unit}</div></div>
-      <div class="stock-num ${low?'low':''}">${val}</div>
+      <div class="stock-num ${low?'low':''}">${valMostrar}</div>
       <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </div>`;
   });
@@ -475,7 +495,7 @@ async function guardarPrecios() {
   // Validar que TODOS los campos tengan un valor mayor a 0 antes de guardar nada
   const faltantes = campos.filter(c => parseMiles(document.getElementById(c.id).value) <= 0);
   if (faltantes.length > 0) {
-    showToast('Faltan precios: ' + faltantes.map(c => c.label).join(', '));
+    showToast('Faltan ' + faltantes.length + ' precio' + (faltantes.length === 1 ? '' : 's') + '. Completá los campos marcados en rojo.');
     // Resaltar en rojo los campos vacíos para que se vean de un vistazo
     campos.forEach(c => {
       const el = document.getElementById(c.id);
@@ -529,11 +549,12 @@ function renderVentas() {
     const p = PRODUCTS[prod];
     const sumQty = list.filter(v => v.prod === prod).reduce((s, v) => s + (v.qty || 0), 0);
     const sumMonto = list.filter(v => v.prod === prod).reduce((s, v) => s + v.monto, 0);
+    const qtyTexto = p.unit === 'docenas' ? fmtDocenasLargo(sumQty) : (sumQty + ' unidad' + (sumQty === 1 ? '' : 'es'));
     resumenHtml += `<div class="prod-row">
       <div class="prod-icon">${icon(prod)}</div>
       <div style="flex:1;">
         <div class="prod-name">${p.label}</div>
-        ${sumQty>0 ? `<span class="qty-pill">${sumQty} ${p.unit}</span>` : ''}
+        ${sumQty>0 ? `<span class="qty-pill">${qtyTexto}</span>` : ''}
       </div>
       <div class="stock-num">${fmtMoney(sumMonto)}</div>
     </div>`;
@@ -723,7 +744,8 @@ function iniciarVenta(prod, optKey, customOpt) {
   const opt = customOpt || PRODUCTS[prod].opts.find(o => o.key === optKey);
   const disponible = stockDisponiblePedido(prod);
   if (disponible < opt.qty) {
-    showToast('No hay suficiente stock de ' + PRODUCTS[prod].label + ' (' + disponible + ' ' + PRODUCTS[prod].unit + ' disponibles)');
+    const dispTexto = PRODUCTS[prod].unit === 'docenas' ? fmtDocenasLargo(disponible) : disponible + ' unidades';
+    showToast('No hay suficiente stock de ' + PRODUCTS[prod].label + ' (' + dispTexto + ' disponibles)');
     return;
   }
   const precio = customOpt ? customOpt.monto : precioFor(prod, optKey);
@@ -835,15 +857,11 @@ async function confirmarVenta() {
   carrito.forEach(item => {
     STATE.stock[item.prod] = Math.max(0, (STATE.stock[item.prod] || 0) - item.qty);
   });
-  const okStock = await saveStock();
 
-  // Guardar cada producto del pedido como su propia venta; el envío se suma
-  // una sola vez, en el último ítem, para no cobrarlo varias veces.
-  let okTodasLasVentas = true;
-  for (let i = 0; i < carrito.length; i++) {
-    const item = carrito[i];
+  // El envío se suma una sola vez, en el último ítem, para no cobrarlo varias veces.
+  const ventaPromises = carrito.map((item, i) => {
     const esUltimo = i === carrito.length - 1;
-    const ok = await addVenta({
+    return addVenta({
       ts: Date.now(),
       prod: item.prod,
       optKey: item.optKey,
@@ -852,8 +870,13 @@ async function confirmarVenta() {
       monto: item.monto + (esUltimo ? envioMonto : 0),
       envio: esUltimo ? envioSeleccionado : null
     });
-    if (!ok) okTodasLasVentas = false;
-  }
+  });
+
+  // Guardar el stock y todas las ventas del pedido al mismo tiempo (en paralelo)
+  // en vez de una por una, así confirmar un pedido con varios productos es rápido.
+  const resultados = await Promise.all([saveStock(), ...ventaPromises]);
+  const okStock = resultados[0];
+  const okTodasLasVentas = resultados.slice(1).every(Boolean);
 
   if (okStock && okTodasLasVentas) {
     const total = carrito.reduce((s, i) => s + i.monto, 0) + envioMonto;
@@ -1040,6 +1063,8 @@ async function confirmarReinicio() {
 }
 
 /* ================= SCANNER ================= */
+let audioCtx = null;
+
 function abrirScanner(modeArg) {
   let scanMode = modeArg;
   if (scanMode !== 'venta' && scanMode !== 'carga') {
@@ -1050,6 +1075,17 @@ function abrirScanner(modeArg) {
   document.getElementById('scanner-title').textContent = scannerMode === 'carga' ? 'Escanear bolsa de stock' : 'Escanear bolsita de venta';
   document.getElementById('scan-status').textContent = 'Buscando código...';
   document.getElementById('overlay-scanner').classList.add('show');
+
+  // El sonido de "bip" solo se puede desbloquear durante un toque real del
+  // usuario (esto, que es un onclick de botón, cuenta). Si lo creamos recién
+  // cuando se detecta el QR (que no es un toque directo), el navegador lo
+  // bloquea y no suena. Por eso se prepara acá y se reusa después.
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {}
+
   startCamera();
 }
 
@@ -1152,18 +1188,18 @@ function scanLoop() {
 /* ================= SONIDO DE ESCANEO ================= */
 function reproducirBip() {
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
     osc.type = 'sine';
     osc.frequency.value = 1000;
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(audioCtx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.15);
+    osc.stop(audioCtx.currentTime + 0.15);
   } catch (e) {
     // Si el navegador no permite sonido acá, no pasa nada grave, seguimos igual.
   }
@@ -1212,7 +1248,8 @@ let sandwichQtyActual = 1;
 function abrirSelectorCantidad(prod) {
   const p = PRODUCTS[prod];
   document.getElementById('qty-title').innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; vertical-align:middle;">${icon(prod,20)} ${p.label} — elegí la cantidad</span>`;
-  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + stockDisponiblePedido(prod) + ' ' + p.unit;
+  const dispTexto = p.unit === 'docenas' ? fmtDocenasLargo(stockDisponiblePedido(prod)) : stockDisponiblePedido(prod) + ' unidades';
+  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + dispTexto;
   const wrap = document.getElementById('qty-options');
   wrap.innerHTML = '';
 
