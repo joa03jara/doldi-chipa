@@ -105,7 +105,8 @@ let STATE = {
   },
   precios: JSON.parse(JSON.stringify(DEFAULT_PRECIOS)),
   ventas: [],
-  remis: []
+  remis: [],
+  premios: []
 };
 let scannerStream = null;
 let scannerLoopId = null;
@@ -175,6 +176,15 @@ function attachListeners() {
     renderResumen();
   }, () => {
     showToast('No se pudo leer los movimientos de Remis');
+  });
+  db.collection('doldichipa_premios').orderBy('costoPuntos', 'asc').onSnapshot(snap => {
+    STATE.premios = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+    renderPremios();
+  }, () => {
+    showToast('No se pudo leer el catálogo de premios');
   });
 }
 
@@ -268,6 +278,78 @@ async function addRemisMov(mov) {
     return true;
   } catch (e) {
     showToast('No se pudo guardar el movimiento');
+    return false;
+  }
+}
+
+/* ================= CLIENTES Y PUNTOS ================= */
+const DIAS_VENCIMIENTO_PUNTOS = 60;
+
+function puntosVigentes(cliente) {
+  if (!cliente) return 0;
+  if (!cliente.ultimaCompra) return cliente.puntos || 0;
+  const dias = (Date.now() - cliente.ultimaCompra) / (1000 * 60 * 60 * 24);
+  return dias > DIAS_VENCIMIENTO_PUNTOS ? 0 : (cliente.puntos || 0);
+}
+
+async function buscarCliente(dni) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return null;
+  }
+  try {
+    const doc = await db.collection('doldichipa_clientes').doc(dni).get();
+    if (!doc.exists) return null;
+    return {
+      dni,
+      ...doc.data()
+    };
+  } catch (e) {
+    showToast('No se pudo buscar el cliente');
+    return null;
+  }
+}
+
+async function guardarCliente(dni, data) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa_clientes').doc(dni).set(data, {
+      merge: true
+    });
+    return true;
+  } catch (e) {
+    showToast('No se pudo guardar el cliente');
+    return false;
+  }
+}
+
+async function addPremio(premio) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa_premios').add(premio);
+    return true;
+  } catch (e) {
+    showToast('No se pudo guardar el premio');
+    return false;
+  }
+}
+
+async function eliminarPremio(id) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa_premios').doc(id).delete();
+    return true;
+  } catch (e) {
+    showToast('No se pudo eliminar el premio');
     return false;
   }
 }
@@ -370,6 +452,11 @@ function irATab(name) {
   else if (name === 'remis') renderRemis();
   else if (name === 'resumen') renderResumen();
   else if (name === 'vender') renderVender();
+  else if (name === 'clientes') {
+    renderPremios();
+    document.getElementById('cliente-buscar-dni').value = '';
+    document.getElementById('cliente-buscar-resultado').innerHTML = '';
+  }
 }
 
 /* ================= RENDER ================= */
@@ -731,6 +818,258 @@ function renderResumen() {
   document.getElementById('resumen-remis').textContent = fmtMoney(netoRemis);
 }
 
+/* ================= PREMIOS (catálogo) ================= */
+function labelTipoPremio(tipo) {
+  return {
+    envio_gratis: 'Envío gratis',
+    descuento_pct: 'Descuento %',
+    descuento_monto: 'Descuento $ fijo',
+    producto_gratis: 'Producto gratis'
+  } [tipo] || tipo;
+}
+
+function detallePremio(p) {
+  if (p.tipo === 'envio_gratis') return 'El pedido no paga envío';
+  if (p.tipo === 'descuento_pct') return p.valor + '% de descuento en el pedido';
+  if (p.tipo === 'descuento_monto') return fmtMoney(p.valor) + ' de descuento en el pedido';
+  if (p.tipo === 'producto_gratis') return (PRODUCTS[p.prod] ? PRODUCTS[p.prod].label : p.prod) + ' - ' + p.cantidadLabel + ' gratis';
+  return '';
+}
+
+function renderPremios() {
+  const wrap = document.getElementById('premios-lista');
+  if (!wrap) return;
+  if (STATE.premios.length === 0) {
+    wrap.innerHTML = '<div class="empty">Todavía no cargaste ningún premio.</div>';
+    return;
+  }
+  wrap.innerHTML = STATE.premios.map(p => `
+    <div class="prod-row">
+      <div style="flex:1;">
+        <div class="prod-name">${p.nombre}</div>
+        <div class="unit-tag">${detallePremio(p)}</div>
+      </div>
+      <div class="stock-num" style="color:var(--orange-dark);">${p.costoPuntos} pts</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="eliminarPremioUI('${p.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+let tipoPremioActual = 'envio_gratis';
+
+function abrirPremioForm() {
+  document.getElementById('premio-nombre').value = '';
+  document.getElementById('premio-costo-puntos').value = '';
+  tipoPremioActual = 'envio_gratis';
+  seleccionarTipoPremio('envio_gratis');
+  document.getElementById('overlay-premio-form').classList.add('show');
+}
+
+function seleccionarTipoPremio(tipo) {
+  tipoPremioActual = tipo;
+  ['envio_gratis', 'descuento_pct', 'descuento_monto', 'producto_gratis'].forEach(t => {
+    document.getElementById('premio-tipo-' + t).style.background = (t === tipo) ? 'var(--orange-soft)' : '';
+  });
+  const extra = document.getElementById('premio-campos-extra');
+  if (tipo === 'descuento_pct') {
+    extra.innerHTML = `<div class="row-input"><label>Porcentaje de descuento</label><div><input type="number" id="premio-valor" min="1" max="100" style="width:90px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;"><span class="prefix" style="margin-left:4px;">%</span></div></div>`;
+  } else if (tipo === 'descuento_monto') {
+    extra.innerHTML = `<div class="row-input"><label>Monto de descuento</label><div><span class="prefix">$</span><input type="text" inputmode="numeric" id="premio-valor" oninput="formatMiles(this)" style="width:120px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;"></div></div>`;
+  } else if (tipo === 'producto_gratis') {
+    extra.innerHTML = `
+      <p class="muted" style="font-weight:700; margin:8px 0; font-size:12px; text-transform:uppercase;">Producto a regalar</p>
+      <div class="grid3" style="margin-bottom:10px;">
+        <div class="qty-btn" id="premio-prod-chipa" onclick="seleccionarProdPremio('chipa')">Chipá</div>
+        <div class="qty-btn" id="premio-prod-factura" onclick="seleccionarProdPremio('factura')">Factura</div>
+        <div class="qty-btn" id="premio-prod-sandwich" onclick="seleccionarProdPremio('sandwich')">Sándwich</div>
+      </div>
+      <div id="premio-cantidad-opts"></div>
+    `;
+    seleccionarProdPremio('chipa');
+  } else {
+    extra.innerHTML = '';
+  }
+}
+
+let premioProdActual = 'chipa';
+let premioCantidadActual = null;
+
+function seleccionarProdPremio(prod) {
+  premioProdActual = prod;
+  ['chipa', 'factura', 'sandwich'].forEach(p => {
+    document.getElementById('premio-prod-' + p).style.background = (p === prod) ? 'var(--orange-soft)' : '';
+  });
+  const wrap = document.getElementById('premio-cantidad-opts');
+  const opts = prod === 'sandwich' ? [{
+    key: 'unidad',
+    label: '1 unidad',
+    qty: 1
+  }] : PRODUCTS[prod].opts;
+  premioCantidadActual = opts[0];
+  wrap.innerHTML = '<div class="grid3">' + opts.map((o, i) => `<div class="qty-btn premio-cant-opt" data-idx="${i}" style="${i===0?'background:var(--orange-soft);':''}" onclick="seleccionarCantidadPremio(${i})">${o.label}</div>`).join('') + '</div>';
+  wrap._opts = opts;
+}
+
+function seleccionarCantidadPremio(idx) {
+  const wrap = document.getElementById('premio-cantidad-opts');
+  premioCantidadActual = wrap._opts[idx];
+  wrap.querySelectorAll('.premio-cant-opt').forEach(el => {
+    el.style.background = (Number(el.dataset.idx) === idx) ? 'var(--orange-soft)' : '';
+  });
+}
+
+async function guardarPremioForm() {
+  const nombre = document.getElementById('premio-nombre').value.trim();
+  const costoPuntos = Number(document.getElementById('premio-costo-puntos').value);
+  if (!nombre || !costoPuntos || costoPuntos <= 0) {
+    showToast('Completá el nombre y el costo en puntos');
+    return;
+  }
+  const premio = {
+    nombre,
+    tipo: tipoPremioActual,
+    costoPuntos
+  };
+  if (tipoPremioActual === 'descuento_pct' || tipoPremioActual === 'descuento_monto') {
+    const valor = parseMiles(document.getElementById('premio-valor').value) || Number(document.getElementById('premio-valor').value);
+    if (!valor || valor <= 0) {
+      showToast('Completá el valor del descuento');
+      return;
+    }
+    premio.valor = valor;
+  }
+  if (tipoPremioActual === 'producto_gratis') {
+    premio.prod = premioProdActual;
+    premio.cantidadKey = premioCantidadActual.key;
+    premio.cantidadLabel = premioCantidadActual.label;
+    premio.cantidadQty = premioCantidadActual.qty;
+  }
+  const ok = await addPremio(premio);
+  if (ok) {
+    cerrarModal('overlay-premio-form');
+    showToast('Premio guardado ✓');
+  }
+}
+
+async function eliminarPremioUI(id) {
+  const ok = await eliminarPremio(id);
+  if (ok) showToast('Premio eliminado');
+}
+
+/* ================= CLIENTES ================= */
+function fmtFecha(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+async function buscarClienteUI() {
+  const dni = document.getElementById('cliente-buscar-dni').value.trim();
+  if (!dni) {
+    showToast('Ingresá un DNI');
+    return;
+  }
+  const wrap = document.getElementById('cliente-buscar-resultado');
+  wrap.innerHTML = '<div class="loading">Buscando...</div>';
+  const cliente = await buscarCliente(dni);
+  if (!cliente) {
+    wrap.innerHTML = '<div class="empty">No hay ningún cliente con ese DNI todavía. Se crea solo la primera vez que compra (poniendo su DNI al finalizar un pedido).</div>';
+    return;
+  }
+  const puntos = puntosVigentes(cliente);
+  const vencidos = puntos === 0 && (cliente.puntos || 0) > 0;
+  wrap.innerHTML = `
+    <div class="prod-row">
+      <div style="flex:1;">
+        <div class="prod-name">${cliente.nombre || 'Sin nombre'}</div>
+        <div class="unit-tag">DNI ${cliente.dni} · Última compra: ${fmtFecha(cliente.ultimaCompra)}</div>
+      </div>
+      <div class="stock-num" style="color:var(--orange-dark);">${puntos} pts</div>
+    </div>
+    ${vencidos ? '<p class="muted" style="color:var(--red); margin-top:6px;">Los puntos vencieron por inactividad.</p>' : ''}
+  `;
+}
+
+let clienteVentaActual = null; // {dni, nombre, puntos, esNuevo}
+let premioSeleccionadoVenta = null;
+
+async function buscarClienteVenta() {
+  const dni = document.getElementById('venta-cliente-dni').value.trim();
+  if (!dni) {
+    showToast('Ingresá un DNI');
+    return;
+  }
+  const wrap = document.getElementById('venta-cliente-resultado');
+  wrap.innerHTML = '<div class="loading">Buscando...</div>';
+  const cliente = await buscarCliente(dni);
+  if (cliente) {
+    clienteVentaActual = {
+      dni,
+      nombre: cliente.nombre || '',
+      puntos: puntosVigentes(cliente),
+      esNuevo: false
+    };
+  } else {
+    clienteVentaActual = {
+      dni,
+      nombre: '',
+      puntos: 0,
+      esNuevo: true
+    };
+  }
+  premioSeleccionadoVenta = null;
+  renderClienteVenta();
+}
+
+function renderClienteVenta() {
+  const wrap = document.getElementById('venta-cliente-resultado');
+  if (!clienteVentaActual) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const c = clienteVentaActual;
+  let html = '';
+  if (c.esNuevo) {
+    html += `
+      <p class="muted" style="margin:4px 0;">Cliente nuevo, se va a crear al confirmar.</p>
+      <input type="text" id="venta-cliente-nombre" placeholder="Nombre (opcional)" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text); margin-bottom:8px;">
+    `;
+  } else {
+    html += `<div class="prod-row"><div class="prod-name" style="flex:1;">${c.nombre || 'Sin nombre'}</div><div class="stock-num" style="color:var(--orange-dark);">${c.puntos} pts</div></div>`;
+  }
+
+  const disponibles = STATE.premios.filter(p => c.puntos >= p.costoPuntos);
+  const noDisponibles = STATE.premios.filter(p => c.puntos < p.costoPuntos);
+
+  if (STATE.premios.length > 0) {
+    html += '<p class="muted" style="font-weight:700; margin:10px 0 6px; font-size:12px; text-transform:uppercase;">Premios disponibles</p>';
+    if (disponibles.length === 0) {
+      html += '<p class="muted">Todavía no le alcanzan los puntos para ningún premio.</p>';
+    } else {
+      html += disponibles.map(p => {
+        const activo = premioSeleccionadoVenta && premioSeleccionadoVenta.id === p.id;
+        return `<div class="qty-btn" style="text-align:left; ${activo?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="seleccionarPremioVenta('${p.id}')">${p.nombre}<span class="p">${p.costoPuntos} pts</span></div>`;
+      }).join('');
+    }
+    if (noDisponibles.length > 0) {
+      html += noDisponibles.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">Faltan ${p.costoPuntos - c.puntos} pts</span></div>`).join('');
+    }
+  }
+  wrap.innerHTML = html;
+}
+
+function seleccionarPremioVenta(id) {
+  if (premioSeleccionadoVenta && premioSeleccionadoVenta.id === id) {
+    premioSeleccionadoVenta = null;
+  } else {
+    premioSeleccionadoVenta = STATE.premios.find(p => p.id === id) || null;
+  }
+  renderClienteVenta();
+}
+
 /* ================= VENTA FLOW ================= */
 let envioSeleccionado = null; // null | 'cerca' | 'lejos'
 let carrito = []; // items del pedido actual: {prod, optKey, qty, label, monto}
@@ -812,6 +1151,10 @@ function abrirFinalizarPedido() {
     </div>
   `;
   envioSeleccionado = null;
+  clienteVentaActual = null;
+  premioSeleccionadoVenta = null;
+  document.getElementById('venta-cliente-dni').value = '';
+  document.getElementById('venta-cliente-resultado').innerHTML = '';
   renderEnvioOpts();
   document.getElementById('overlay-confirm').classList.add('show');
 }
@@ -845,22 +1188,69 @@ function seleccionarEnvio(key) {
   renderEnvioOpts();
 }
 
+function aplicarDescuentoAItems(items, descuentoTotal) {
+  let restante = descuentoTotal;
+  for (let i = items.length - 1; i >= 0 && restante > 0; i--) {
+    const aplicar = Math.min(items[i].monto, restante);
+    items[i].monto -= aplicar;
+    restante -= aplicar;
+  }
+  return items;
+}
+
 async function confirmarVenta() {
   if (carrito.length === 0) return;
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
   }
-  const envioMonto = envioSeleccionado ? (STATE.precios.envio[envioSeleccionado] || 0) : 0;
+
+  // Chequeo de seguridad: que el premio elegido siga siendo válido para este cliente
+  if (premioSeleccionadoVenta && clienteVentaActual && clienteVentaActual.puntos < premioSeleccionadoVenta.costoPuntos) {
+    showToast('Ese cliente ya no tiene puntos suficientes para ese premio');
+    return;
+  }
+
+  const subtotalOriginal = carrito.reduce((s, i) => s + i.monto, 0);
+  let envioMonto = envioSeleccionado ? (STATE.precios.envio[envioSeleccionado] || 0) : 0;
+
+  // Armar la lista final de ítems a guardar (agrega el producto gratis si corresponde)
+  let items = carrito.map(i => ({
+    ...i
+  }));
+
+  if (premioSeleccionadoVenta) {
+    if (premioSeleccionadoVenta.tipo === 'envio_gratis') {
+      envioMonto = 0;
+    } else if (premioSeleccionadoVenta.tipo === 'descuento_pct') {
+      const descuento = Math.round(subtotalOriginal * premioSeleccionadoVenta.valor / 100);
+      aplicarDescuentoAItems(items, descuento);
+    } else if (premioSeleccionadoVenta.tipo === 'descuento_monto') {
+      aplicarDescuentoAItems(items, Math.min(premioSeleccionadoVenta.valor, subtotalOriginal));
+    } else if (premioSeleccionadoVenta.tipo === 'producto_gratis') {
+      const disponible = stockDisponiblePedido(premioSeleccionadoVenta.prod);
+      if (disponible < premioSeleccionadoVenta.cantidadQty) {
+        showToast('No hay stock suficiente para entregar el premio "' + premioSeleccionadoVenta.nombre + '"');
+        return;
+      }
+      items.push({
+        prod: premioSeleccionadoVenta.prod,
+        optKey: premioSeleccionadoVenta.cantidadKey,
+        qty: premioSeleccionadoVenta.cantidadQty,
+        label: premioSeleccionadoVenta.cantidadLabel + ' (canje)',
+        monto: 0
+      });
+    }
+  }
 
   // Descontar el stock de cada producto del pedido (sumando cantidades repetidas)
-  carrito.forEach(item => {
+  items.forEach(item => {
     STATE.stock[item.prod] = Math.max(0, (STATE.stock[item.prod] || 0) - item.qty);
   });
 
   // El envío se suma una sola vez, en el último ítem, para no cobrarlo varias veces.
-  const ventaPromises = carrito.map((item, i) => {
-    const esUltimo = i === carrito.length - 1;
+  const ventaPromises = items.map((item, i) => {
+    const esUltimo = i === items.length - 1;
     return addVenta({
       ts: Date.now(),
       prod: item.prod,
@@ -872,18 +1262,39 @@ async function confirmarVenta() {
     });
   });
 
-  // Guardar el stock y todas las ventas del pedido al mismo tiempo (en paralelo)
-  // en vez de una por una, así confirmar un pedido con varios productos es rápido.
-  const resultados = await Promise.all([saveStock(), ...ventaPromises]);
-  const okStock = resultados[0];
-  const okTodasLasVentas = resultados.slice(1).every(Boolean);
+  const promesas = [saveStock(), ...ventaPromises];
 
-  if (okStock && okTodasLasVentas) {
-    const total = carrito.reduce((s, i) => s + i.monto, 0) + envioMonto;
+  // Si hay un cliente cargado, sumar/descontar sus puntos también en paralelo
+  if (clienteVentaActual) {
+    const puntosGanados = Math.floor(subtotalOriginal / 1000);
+    const nuevosPuntos = Math.max(0, clienteVentaActual.puntos - (premioSeleccionadoVenta ? premioSeleccionadoVenta.costoPuntos : 0) + puntosGanados);
+    const datosCliente = {
+      puntos: nuevosPuntos,
+      ultimaCompra: Date.now()
+    };
+    if (clienteVentaActual.esNuevo) {
+      datosCliente.creado = Date.now();
+      const nombreInput = document.getElementById('venta-cliente-nombre');
+      datosCliente.nombre = nombreInput ? nombreInput.value.trim() : '';
+    } else if (clienteVentaActual.nombre) {
+      datosCliente.nombre = clienteVentaActual.nombre;
+    }
+    promesas.push(guardarCliente(clienteVentaActual.dni, datosCliente));
+  }
+
+  // Guardar todo al mismo tiempo (en paralelo) en vez de uno por uno, para que sea rápido.
+  const resultados = await Promise.all(promesas);
+  const okStock = resultados[0];
+  const okResto = resultados.slice(1).every(Boolean);
+
+  if (okStock && okResto) {
+    const total = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
     cerrarModal('overlay-confirm');
-    showToast('Pedido registrado · ' + fmtMoney(total));
+    showToast('Pedido registrado · ' + fmtMoney(total) + (premioSeleccionadoVenta ? ' · Premio aplicado: ' + premioSeleccionadoVenta.nombre : ''));
     carrito = [];
     envioSeleccionado = null;
+    clienteVentaActual = null;
+    premioSeleccionadoVenta = null;
     renderCarrito();
   }
   renderVender();
