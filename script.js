@@ -1313,28 +1313,47 @@ async function confirmarVenta() {
 }
 
 /* ================= CARGA FLOW ================= */
-async function cargarBolsa(prod) {
-  STATE.stock[prod] = (STATE.stock[prod] || 0) + 18;
-  const ok = await saveStock();
-  if (ok) showToast('+ 18 docenas de ' + PRODUCTS[prod].label + ' cargadas ✓');
-  renderStock();
-  renderVender();
-}
+/* ================= STOCK: agregar / corregir / vaciar (todo junto) ================= */
+let editarStockProd = null;
 
-let cargaManualProd = null;
-
-function cargaManual(prod) {
-  cargaManualProd = prod;
+function abrirEditarStock(prod) {
+  editarStockProd = prod;
   const p = PRODUCTS[prod];
-  document.getElementById('carga-manual-title').textContent = 'Cargar ' + p.label;
-  document.getElementById('carga-manual-label').textContent = 'Cantidad (' + p.unit + ')';
-  document.getElementById('carga-manual-input').value = '';
-  document.getElementById('carga-manual-input').style.borderColor = 'var(--border)';
-  document.getElementById('carga-manual-input').step = p.unit === 'docenas' ? '0.5' : '1';
-  document.getElementById('overlay-carga-manual').classList.add('show');
+  document.getElementById('editar-stock-title').textContent = p.label + ' — Stock';
+
+  // Sección "Agregar stock"
+  const esBolsas = p.unit === 'docenas';
+  document.getElementById('agregar-stock-label').textContent = esBolsas ? 'Cantidad de bolsas (18 docenas c/u)' : 'Cantidad de unidades hechas';
+  const agregarInput = document.getElementById('agregar-stock-input');
+  agregarInput.value = '';
+  agregarInput.style.borderColor = 'var(--border)';
+  agregarInput.step = '1';
+  document.getElementById('agregar-stock-preview').textContent = '';
+  actualizarPreviewAgregarStock();
+
+  // Sección "Corregir cantidad exacta"
+  const editarInput = document.getElementById('editar-stock-input');
+  editarInput.step = esBolsas ? '0.5' : '1';
+  editarInput.value = STATE.stock[prod] || 0;
+  editarInput.style.borderColor = 'var(--border)';
+  document.getElementById('editar-stock-label').textContent = 'Cantidad (' + p.unit + ')';
+
+  document.getElementById('overlay-editar-stock').classList.add('show');
 }
-async function confirmarCargaManual() {
-  const input = document.getElementById('carga-manual-input');
+
+function actualizarPreviewAgregarStock() {
+  if (!editarStockProd) return;
+  const p = PRODUCTS[editarStockProd];
+  const val = Number(document.getElementById('agregar-stock-input').value) || 0;
+  if (p.unit === 'docenas') {
+    document.getElementById('agregar-stock-preview').textContent = val > 0 ? '= ' + (val * 18) + ' docenas' : '';
+  } else {
+    document.getElementById('agregar-stock-preview').textContent = '';
+  }
+}
+
+async function confirmarAgregarStock() {
+  const input = document.getElementById('agregar-stock-input');
   const val = Number(input.value);
   if (!val || val <= 0) {
     input.style.borderColor = 'var(--red)';
@@ -1342,83 +1361,20 @@ async function confirmarCargaManual() {
     return;
   }
   input.style.borderColor = 'var(--border)';
-  STATE.stock[cargaManualProd] = (STATE.stock[cargaManualProd] || 0) + val;
+  const p = PRODUCTS[editarStockProd];
+  const aAgregar = p.unit === 'docenas' ? val * 18 : val;
+  STATE.stock[editarStockProd] = (STATE.stock[editarStockProd] || 0) + aAgregar;
   const ok = await saveStock();
   if (ok) {
-    cerrarModal('overlay-carga-manual');
-    showToast('Stock actualizado ✓');
+    showToast('+ ' + aAgregar + ' ' + p.unit + ' de ' + p.label + ' agregadas ✓');
+    input.value = '';
+    document.getElementById('agregar-stock-preview').textContent = '';
+    document.getElementById('editar-stock-input').value = STATE.stock[editarStockProd];
   }
   renderStock();
   renderVender();
 }
 
-/* ================= CARGA BOLSA MANUAL (sin sticker QR) ================= */
-let bolsaManualProd = null;
-
-function abrirCargaBolsaManual() {
-  bolsaManualProd = null;
-  document.getElementById('bolsa-manual-input').value = 1;
-  document.getElementById('bolsa-manual-input').style.borderColor = 'var(--border)';
-  actualizarSeleccionBolsa();
-  actualizarPreviewBolsa();
-  document.getElementById('overlay-carga-bolsa-manual').classList.add('show');
-}
-
-function seleccionarProductoBolsa(prod) {
-  bolsaManualProd = prod;
-  actualizarSeleccionBolsa();
-}
-
-function actualizarSeleccionBolsa() {
-  document.getElementById('bolsa-manual-chipa').style.background = bolsaManualProd === 'chipa' ? 'var(--orange-soft)' : '';
-  document.getElementById('bolsa-manual-factura').style.background = bolsaManualProd === 'factura' ? 'var(--orange-soft)' : '';
-  document.getElementById('bolsa-manual-chipa').style.borderColor = 'var(--border)';
-  document.getElementById('bolsa-manual-factura').style.borderColor = 'var(--border)';
-}
-
-function actualizarPreviewBolsa() {
-  const bolsas = Number(document.getElementById('bolsa-manual-input').value) || 0;
-  document.getElementById('bolsa-manual-preview').textContent = '= ' + (bolsas * 18) + ' docenas';
-}
-async function confirmarCargaBolsaManual() {
-  const input = document.getElementById('bolsa-manual-input');
-  const bolsas = Number(input.value);
-  let faltantes = [];
-  if (!bolsaManualProd) faltantes.push('Producto (Chipá o Factura)');
-  if (!bolsas || bolsas <= 0) faltantes.push('Cantidad de bolsas');
-
-  document.getElementById('bolsa-manual-chipa').style.borderColor = !bolsaManualProd ? 'var(--red)' : 'var(--border)';
-  document.getElementById('bolsa-manual-factura').style.borderColor = !bolsaManualProd ? 'var(--red)' : 'var(--border)';
-  input.style.borderColor = (!bolsas || bolsas <= 0) ? 'var(--red)' : 'var(--border)';
-
-  if (faltantes.length > 0) {
-    showToast('Completá: ' + faltantes.join(', '));
-    return;
-  }
-  const docenas = bolsas * 18;
-  STATE.stock[bolsaManualProd] = (STATE.stock[bolsaManualProd] || 0) + docenas;
-  const ok = await saveStock();
-  if (ok) {
-    cerrarModal('overlay-carga-bolsa-manual');
-    showToast('+ ' + docenas + ' docenas de ' + PRODUCTS[bolsaManualProd].label + ' cargadas ✓');
-  }
-  renderStock();
-  renderVender();
-}
-
-/* ================= EDITAR / BORRAR STOCK ================= */
-let editarStockProd = null;
-
-function abrirEditarStock(prod) {
-  editarStockProd = prod;
-  const p = PRODUCTS[prod];
-  document.getElementById('editar-stock-title').textContent = 'Editar stock: ' + p.label;
-  document.getElementById('editar-stock-label').textContent = 'Cantidad (' + p.unit + ')';
-  document.getElementById('editar-stock-input').step = p.unit === 'docenas' ? '0.5' : '1';
-  document.getElementById('editar-stock-input').value = STATE.stock[prod] || 0;
-  document.getElementById('editar-stock-input').style.borderColor = 'var(--border)';
-  document.getElementById('overlay-editar-stock').classList.add('show');
-}
 async function confirmarEditarStock() {
   const input = document.getElementById('editar-stock-input');
   const raw = input.value.trim();
@@ -1487,13 +1443,8 @@ async function confirmarReinicio() {
 let audioCtx = null;
 
 function abrirScanner(modeArg) {
-  let scanMode = modeArg;
-  if (scanMode !== 'venta' && scanMode !== 'carga') {
-    const activeTab = document.querySelector('.drawer-item.active').dataset.tab;
-    scanMode = activeTab === 'cargar' ? 'carga' : 'venta';
-  }
-  scannerMode = scanMode;
-  document.getElementById('scanner-title').textContent = scannerMode === 'carga' ? 'Escanear bolsa de stock' : 'Escanear bolsita de venta';
+  scannerMode = modeArg || 'venta';
+  document.getElementById('scanner-title').textContent = 'Escanear bolsita de venta';
   document.getElementById('scan-status').textContent = 'Buscando código...';
   document.getElementById('overlay-scanner').classList.add('show');
 

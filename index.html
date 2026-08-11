@@ -75,33 +75,6 @@
       </div>
     </section>
 
-    <!-- CARGAR -->
-    <section class="tab-panel" id="tab-cargar">
-      <div class="section-title">Cargar stock</div>
-      <div class="card" style="text-align:center; padding:28px 18px;">
-        <div style="width:64px; height:64px; border-radius:50%; background:var(--orange-soft); display:flex; align-items:center; justify-content:center; margin:0 auto 14px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" width="30" height="30">
-            <path d="M21 8l-9-5-9 5 9 5 9-5z" />
-            <path d="M3 8v8l9 5 9-5V8" />
-            <path d="M12 13v8" />
-          </svg>
-        </div>
-        <h2 style="justify-content:center; margin-bottom:4px;">Cargar bolsas de stock</h2>
-        <p class="muted" style="margin-bottom:18px;">Elegí Chipá o Factura y decinos cuántas bolsas de 18 docenas cargás.</p>
-        <button class="btn btn-gold btn-block" onclick="abrirCargaBolsaManual()">Cargar stock</button>
-      </div>
-      <div class="card">
-        <h2><span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3.5 11.5L12 4.5l8.5 7" />
-              <path d="M4 11.5v3.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.2" />
-              <path d="M3.5 11.5h17" />
-              <path d="M7 16.7l1-2M12 16.7v-2M17 16.7l-1-2" />
-            </svg></span>Sándwich de chipá</h2>
-        <p class="muted" style="margin-top:-4px;">No lleva QR de carga: sumá acá las unidades que hiciste.</p>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="cargaManual('sandwich')">Cargar unidades hechas</button>
-      </div>
-    </section>
-
     <!-- REMIS -->
     <section class="tab-panel" id="tab-remis">
       <div class="section-title">Remis</div>
@@ -399,14 +372,6 @@
       </svg>
       Vender
     </button>
-    <button class="drawer-item" data-tab="cargar" onclick="irATab('cargar')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 8l-9-5-9 5 9 5 9-5z" />
-        <path d="M3 8v8l9 5 9-5V8" />
-        <path d="M12 13v8" />
-      </svg>
-      Cargar stock
-    </button>
     <button class="drawer-item" data-tab="remis" onclick="irATab('remis')">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 11.5l1.3-4A2 2 0 0 1 8.2 6.2h7.6a2 2 0 0 1 1.9 1.3l1.3 4" />
@@ -542,61 +507,26 @@
     </div>
   </div>
 
-  <!-- MANUAL LOAD MODAL -->
-  <div class="overlay" id="overlay-carga-manual">
-    <div class="sheet sheet-wrap">
-      <button class="close" onclick="cerrarModal('overlay-carga-manual')">✕</button>
-      <h3 id="carga-manual-title">Cargar stock</h3>
-      <div class="row-input">
-        <label id="carga-manual-label">Cantidad</label>
-        <input type="number" id="carga-manual-input" step="0.5" min="0" style="width:120px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
-      </div>
-      <button class="btn btn-green btn-block" style="margin-top:14px;" onclick="confirmarCargaManual()">Agregar al stock</button>
-    </div>
-  </div>
-
-  <!-- MANUAL BAG LOAD (sin sticker QR) -->
-  <div class="overlay" id="overlay-carga-bolsa-manual">
-    <div class="sheet sheet-wrap">
-      <button class="close" onclick="cerrarModal('overlay-carga-bolsa-manual')">✕</button>
-      <h3>Cargar bolsa sin QR</h3>
-      <p class="muted" style="margin-top:0;">Elegí el producto y cuántas bolsas de 18 docenas cargás.</p>
-      <p class="muted" style="font-weight:700; margin:14px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Producto</p>
-      <div class="grid2" style="margin-bottom:16px;">
-        <div class="qty-btn" id="bolsa-manual-chipa" onclick="seleccionarProductoBolsa('chipa')"><span class="h2-icon" style="margin-right:5px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-              <circle cx="12" cy="13" r="7.2" />
-              <circle cx="9" cy="11" r="0.5" fill="currentColor" stroke="none" />
-              <circle cx="14.5" cy="10.5" r="0.5" fill="currentColor" stroke="none" />
-              <circle cx="12" cy="15.5" r="0.5" fill="currentColor" stroke="none" />
-              <circle cx="15.5" cy="14" r="0.5" fill="currentColor" stroke="none" />
-              <circle cx="8.5" cy="15" r="0.5" fill="currentColor" stroke="none" />
-            </svg></span>Chipá</div>
-        <div class="qty-btn" id="bolsa-manual-factura" onclick="seleccionarProductoBolsa('factura')"><span class="h2-icon" style="margin-right:5px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3.5 15.5c1-6.5 5.5-10.5 10-10.5 4 0 6.5 2 6.5 4.7 0 2-1.8 3.3-4 3.3-1 3-4 5-7.5 5-2.3 0-5-.8-5-2.5z" />
-              <path d="M9 8.5l1 3.2M13 7l1.2 3.3M16.5 8.5l1 2.6" />
-            </svg></span>Factura</div>
-      </div>
-      <p class="muted" style="font-weight:700; margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Cantidad</p>
-      <div class="row-input">
-        <label>Cantidad de bolsas</label>
-        <input type="number" id="bolsa-manual-input" min="1" step="1" value="1" oninput="actualizarPreviewBolsa()" style="width:100px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
-      </div>
-      <p class="muted" id="bolsa-manual-preview" style="margin:6px 0 0;">= 18 docenas</p>
-      <button class="btn btn-green btn-block" style="margin-top:16px;" onclick="confirmarCargaBolsaManual()">Agregar al stock</button>
-    </div>
-  </div>
-
   <!-- EDIT/DELETE STOCK -->
   <div class="overlay" id="overlay-editar-stock">
     <div class="sheet sheet-wrap">
       <button class="close" onclick="cerrarModal('overlay-editar-stock')">✕</button>
-      <h3 id="editar-stock-title">Editar stock</h3>
-      <p class="muted" style="margin-top:0;">Corregí la cantidad exacta que tenés ahora mismo.</p>
+      <h3 id="editar-stock-title">Stock</h3>
+
+      <p class="muted" style="font-weight:700; margin:10px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Agregar stock</p>
+      <div class="row-input">
+        <label id="agregar-stock-label">Cantidad</label>
+        <input type="number" id="agregar-stock-input" min="1" step="1" oninput="actualizarPreviewAgregarStock()" style="width:110px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+      </div>
+      <p class="muted" id="agregar-stock-preview" style="margin:4px 0 0;"></p>
+      <button class="btn btn-gold btn-block" style="margin-top:10px;" onclick="confirmarAgregarStock()">Agregar</button>
+
+      <p class="muted" style="font-weight:700; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Corregir cantidad exacta</p>
       <div class="row-input">
         <label id="editar-stock-label">Cantidad</label>
         <input type="number" id="editar-stock-input" step="0.5" min="0" style="width:120px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
       </div>
-      <button class="btn btn-green btn-block" style="margin-top:14px;" onclick="confirmarEditarStock()">Guardar cantidad</button>
+      <button class="btn btn-green btn-block" style="margin-top:10px;" onclick="confirmarEditarStock()">Guardar cantidad exacta</button>
       <button class="btn btn-rust btn-block" style="margin-top:10px;" onclick="vaciarStock()">Vaciar (poner en 0)</button>
     </div>
   </div>
