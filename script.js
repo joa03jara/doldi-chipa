@@ -107,7 +107,6 @@ let STATE = {
   ventas: [],
   remis: []
 };
-let pendingSale = null; // {prod, optKey, qty}
 let scannerStream = null;
 let scannerLoopId = null;
 let scannerMode = 'venta'; // venta | carga
@@ -362,7 +361,6 @@ function renderAll() {
   renderVentas();
   renderRemis();
   renderResumen();
-  renderQRs();
 }
 
 function renderVender() {
@@ -712,85 +710,84 @@ function renderResumen() {
   document.getElementById('resumen-remis').textContent = fmtMoney(netoRemis);
 }
 
-function renderQRs() {
-  const specs = [
-    ['qr-venta-chipa', 'DOLDI:VENTA:CHIPA'],
-    ['qr-venta-factura', 'DOLDI:VENTA:FACTURA'],
-    ['qr-venta-sandwich', 'DOLDI:VENTA:SANDWICH'],
-  ];
-  specs.forEach(([id, data]) => {
-    const el = document.getElementById(id);
-    if (!el || el.dataset.rendered) return;
-    el.innerHTML = '';
-    new QRCode(el, {
-      text: data,
-      width: 500,
-      height: 500,
-      colorDark: '#2a2118',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-    // Mostrarlo chico en pantalla aunque el archivo real sea de alta resolución
-    const img = el.querySelector('canvas, img');
-    if (img) {
-      img.style.width = '150px';
-      img.style.height = '150px';
-    }
-    el.dataset.rendered = '1';
-  });
-}
-
-function getQRDataUrl(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return null;
-  const canvas = el.querySelector('canvas');
-  if (canvas) return canvas.toDataURL('image/png');
-  const img = el.querySelector('img');
-  if (img && img.src) return img.src;
-  return null;
-}
-
-function descargarQR(containerId, filename) {
-  const dataUrl = getQRDataUrl(containerId);
-  if (!dataUrl) {
-    showToast('No se pudo generar ese QR para descargar');
-    return;
-  }
-  const a = document.createElement('a');
-  a.href = dataUrl;
-  a.download = filename + '.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
 /* ================= VENTA FLOW ================= */
 let envioSeleccionado = null; // null | 'cerca' | 'lejos'
+let carrito = []; // items del pedido actual: {prod, optKey, qty, label, monto}
 
-function iniciarVenta(prod, optKey) {
-  const opt = PRODUCTS[prod].opts.find(o => o.key === optKey);
-  const stockVal = STATE.stock[prod] || 0;
-  if (stockVal < opt.qty) {
-    showToast('No hay suficiente stock de ' + PRODUCTS[prod].label);
+function stockDisponiblePedido(prod) {
+  const enCarrito = carrito.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
+  return (STATE.stock[prod] || 0) - enCarrito;
+}
+
+function iniciarVenta(prod, optKey, customOpt) {
+  const opt = customOpt || PRODUCTS[prod].opts.find(o => o.key === optKey);
+  const disponible = stockDisponiblePedido(prod);
+  if (disponible < opt.qty) {
+    showToast('No hay suficiente stock de ' + PRODUCTS[prod].label + ' (' + disponible + ' ' + PRODUCTS[prod].unit + ' disponibles)');
     return;
   }
-  const precio = precioFor(prod, optKey);
+  const precio = customOpt ? customOpt.monto : precioFor(prod, optKey);
   if (!precio || precio <= 0) {
-    showToast('Falta cargar el precio de ' + PRODUCTS[prod].label + ' (' + opt.label + ') en Precios');
+    showToast('Falta cargar el precio de ' + PRODUCTS[prod].label + ' en Precios');
     return;
   }
-  pendingSale = {
+  carrito.push({
     prod,
     optKey,
     qty: opt.qty,
     label: opt.label,
     monto: precio
-  };
+  });
+  renderCarrito();
+  showToast('Agregado al pedido: ' + PRODUCTS[prod].label + ' - ' + opt.label);
+}
+
+function renderCarrito() {
+  const card = document.getElementById('carrito-card');
+  const lista = document.getElementById('carrito-lista');
+  if (carrito.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  lista.innerHTML = carrito.map((item, idx) => `
+    <div class="prod-row">
+      <div class="prod-icon">${icon(item.prod)}</div>
+      <div style="flex:1;"><div class="prod-name">${PRODUCTS[item.prod].label}</div><div class="unit-tag">${item.label}</div></div>
+      <div class="stock-num">${fmtMoney(item.monto)}</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="quitarDelCarrito(${idx})">✕</button>
+    </div>
+  `).join('');
+  const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
+  document.getElementById('carrito-subtotal').textContent = fmtMoney(subtotal);
+}
+
+function quitarDelCarrito(idx) {
+  carrito.splice(idx, 1);
+  renderCarrito();
+}
+
+function vaciarCarrito() {
+  carrito = [];
+  renderCarrito();
+  showToast('Pedido vaciado');
+}
+
+function abrirFinalizarPedido() {
+  if (carrito.length === 0) return;
   const body = document.getElementById('confirm-body');
-  body.innerHTML = `
-    <div class="prod-row"><div class="prod-icon">${icon(prod)}</div><div class="prod-name" style="flex:1;">${PRODUCTS[prod].label}</div><div class="unit-tag">${opt.label}</div></div>
-    <div class="prod-row"><div class="prod-name">Precio</div><div class="stock-num">${fmtMoney(pendingSale.monto)}</div></div>
-    <div class="prod-row"><div class="prod-name">Stock luego</div><div class="unit-tag">${(stockVal-opt.qty)} ${PRODUCTS[prod].unit}</div></div>
+  const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
+  body.innerHTML = carrito.map(item => `
+    <div class="prod-row">
+      <div class="prod-icon">${icon(item.prod)}</div>
+      <div style="flex:1;"><div class="prod-name">${PRODUCTS[item.prod].label}</div><div class="unit-tag">${item.label}</div></div>
+      <div class="stock-num">${fmtMoney(item.monto)}</div>
+    </div>
+  `).join('') + `
+    <div class="prod-row" style="border-top:1.5px solid var(--border); padding-top:10px;">
+      <div class="prod-name" style="flex:1;">Subtotal</div>
+      <div class="stock-num">${fmtMoney(subtotal)}</div>
+    </div>
   `;
   envioSeleccionado = null;
   renderEnvioOpts();
@@ -827,28 +824,44 @@ function seleccionarEnvio(key) {
 }
 
 async function confirmarVenta() {
-  if (!pendingSale) return;
+  if (carrito.length === 0) return;
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
   }
   const envioMonto = envioSeleccionado ? (STATE.precios.envio[envioSeleccionado] || 0) : 0;
-  STATE.stock[pendingSale.prod] = Math.max(0, (STATE.stock[pendingSale.prod] || 0) - pendingSale.qty);
-  const okStock = await saveStock();
-  const okVenta = await addVenta({
-    ts: Date.now(),
-    prod: pendingSale.prod,
-    optKey: pendingSale.optKey,
-    qty: pendingSale.qty,
-    qtyLabel: pendingSale.label,
-    monto: pendingSale.monto + envioMonto,
-    envio: envioSeleccionado
+
+  // Descontar el stock de cada producto del pedido (sumando cantidades repetidas)
+  carrito.forEach(item => {
+    STATE.stock[item.prod] = Math.max(0, (STATE.stock[item.prod] || 0) - item.qty);
   });
-  if (okStock && okVenta) {
+  const okStock = await saveStock();
+
+  // Guardar cada producto del pedido como su propia venta; el envío se suma
+  // una sola vez, en el último ítem, para no cobrarlo varias veces.
+  let okTodasLasVentas = true;
+  for (let i = 0; i < carrito.length; i++) {
+    const item = carrito[i];
+    const esUltimo = i === carrito.length - 1;
+    const ok = await addVenta({
+      ts: Date.now(),
+      prod: item.prod,
+      optKey: item.optKey,
+      qty: item.qty,
+      qtyLabel: item.label,
+      monto: item.monto + (esUltimo ? envioMonto : 0),
+      envio: esUltimo ? envioSeleccionado : null
+    });
+    if (!ok) okTodasLasVentas = false;
+  }
+
+  if (okStock && okTodasLasVentas) {
+    const total = carrito.reduce((s, i) => s + i.monto, 0) + envioMonto;
     cerrarModal('overlay-confirm');
-    showToast('Venta registrada · ' + fmtMoney(pendingSale.monto + envioMonto));
-    pendingSale = null;
+    showToast('Pedido registrado · ' + fmtMoney(total));
+    carrito = [];
     envioSeleccionado = null;
+    renderCarrito();
   }
   renderVender();
   renderStock();
@@ -1136,6 +1149,26 @@ function scanLoop() {
   }
 }
 
+/* ================= SONIDO DE ESCANEO ================= */
+function reproducirBip() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 1000;
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) {
+    // Si el navegador no permite sonido acá, no pasa nada grave, seguimos igual.
+  }
+}
+
 function handleScanResult(text) {
   try {
     const parts = text.trim().split(':');
@@ -1157,6 +1190,7 @@ function handleScanResult(text) {
       scannerLoopId = requestAnimationFrame(scanLoop);
       return;
     }
+    reproducirBip();
     cerrarScanner();
     if (tipo === 'VENTA') {
       abrirSelectorCantidad(prod);
@@ -1173,25 +1207,72 @@ function handleScanResult(text) {
   }
 }
 
+let sandwichQtyActual = 1;
+
 function abrirSelectorCantidad(prod) {
   const p = PRODUCTS[prod];
   document.getElementById('qty-title').innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; vertical-align:middle;">${icon(prod,20)} ${p.label} — elegí la cantidad</span>`;
-  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + (STATE.stock[prod] || 0) + ' ' + p.unit;
+  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + stockDisponiblePedido(prod) + ' ' + p.unit;
   const wrap = document.getElementById('qty-options');
   wrap.innerHTML = '';
-  p.opts.forEach(o => {
-    const btn = document.createElement('div');
-    btn.className = 'qty-btn';
-    btn.style.textAlign = 'left';
-    btn.innerHTML = `${o.label} <span class="p">${fmtMoney(precioFor(prod,o.key))}</span>`;
-    btn.onclick = () => {
-      cerrarModal('overlay-qty');
-      iniciarVenta(prod, o.key);
-    };
-    wrap.appendChild(btn);
-  });
+
+  if (prod === 'sandwich') {
+    // El sándwich no viene en bolsas de tamaño fijo: cantidad libre con +/-
+    sandwichQtyActual = 1;
+    wrap.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:center; gap:24px; padding:14px 0 6px;">
+        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadSandwich(-1)">−</button>
+        <div style="font-size:34px; font-weight:800; min-width:56px; text-align:center;" id="sandwich-qty-display">1</div>
+        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadSandwich(1)">+</button>
+      </div>
+      <p class="muted" style="text-align:center; margin:4px 0 14px;" id="sandwich-qty-precio">$0</p>
+      <button class="btn btn-green btn-block" onclick="confirmarCantidadSandwich()">Continuar</button>
+    `;
+    actualizarDisplaySandwich();
+  } else {
+    p.opts.forEach(o => {
+      const btn = document.createElement('div');
+      btn.className = 'qty-btn';
+      btn.style.textAlign = 'left';
+      btn.innerHTML = `${o.label} <span class="p">${fmtMoney(precioFor(prod,o.key))}</span>`;
+      btn.onclick = () => {
+        cerrarModal('overlay-qty');
+        iniciarVenta(prod, o.key);
+      };
+      wrap.appendChild(btn);
+    });
+  }
   document.getElementById('overlay-qty').classList.add('show');
 }
+
+function cambiarCantidadSandwich(delta) {
+  const nueva = sandwichQtyActual + delta;
+  if (nueva < 1) return;
+  const stockVal = stockDisponiblePedido('sandwich');
+  if (nueva > stockVal) {
+    showToast('No hay suficiente stock de Sándwich de chipá (' + stockVal + ' disponibles)');
+    return;
+  }
+  sandwichQtyActual = nueva;
+  actualizarDisplaySandwich();
+}
+
+function actualizarDisplaySandwich() {
+  document.getElementById('sandwich-qty-display').textContent = sandwichQtyActual;
+  const precioUnidad = STATE.precios.sandwich.unidad || 0;
+  document.getElementById('sandwich-qty-precio').textContent = fmtMoney(precioUnidad * sandwichQtyActual);
+}
+
+function confirmarCantidadSandwich() {
+  const precioUnidad = STATE.precios.sandwich.unidad || 0;
+  cerrarModal('overlay-qty');
+  iniciarVenta('sandwich', 'custom', {
+    qty: sandwichQtyActual,
+    label: sandwichQtyActual + ' unidad' + (sandwichQtyActual === 1 ? '' : 'es'),
+    monto: precioUnidad * sandwichQtyActual
+  });
+}
+
 
 /* ================= TEMA (claro/oscuro) ================= */
 function applyTheme(t) {
