@@ -1060,10 +1060,10 @@ async function startCamera() {
           ideal: 'environment'
         },
         width: {
-          ideal: 1920
+          ideal: 1280
         },
         height: {
-          ideal: 1080
+          ideal: 720
         }
       }
     });
@@ -1107,10 +1107,18 @@ function stopCamera() {
 function scanLoop() {
   const video = document.getElementById('scanner-video');
   const canvas = document.getElementById('scanner-canvas');
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+  if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+    // Reducir el tamaño de la imagen que se analiza: procesar el video a
+    // resolución completa en cada cuadro es lento y hace que el escaneo
+    // se "trabe" sin nunca llegar a detectar el código. Con un tamaño
+    // más chico, se analizan muchos más cuadros por segundo.
+    const MAX_DIM = 720;
+    const scale = Math.min(1, MAX_DIM / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const ctx = canvas.getContext('2d', {
+      willReadFrequently: true
+    });
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(img.data, img.width, img.height, {
