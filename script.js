@@ -832,7 +832,7 @@ function detallePremio(p) {
   if (p.tipo === 'envio_gratis') return 'El pedido no paga envío';
   if (p.tipo === 'descuento_pct') return p.valor + '% de descuento en el pedido';
   if (p.tipo === 'descuento_monto') return fmtMoney(p.valor) + ' de descuento en el pedido';
-  if (p.tipo === 'producto_gratis') return (PRODUCTS[p.prod] ? PRODUCTS[p.prod].label : p.prod) + ' - ' + p.cantidadLabel + ' gratis';
+  if (p.tipo === 'producto_gratis') return 'Si el pedido tiene ' + p.cantidadLabel + ' o más de ' + (PRODUCTS[p.prod] ? PRODUCTS[p.prod].label : p.prod) + ', esa parte sale gratis';
   return '';
 }
 
@@ -1024,6 +1024,11 @@ async function buscarClienteVenta() {
   renderClienteVenta();
 }
 
+function pedidoAlcanzaParaPremio(premio) {
+  if (premio.tipo !== 'producto_gratis') return true;
+  return carrito.some(i => i.prod === premio.prod && i.qty >= premio.cantidadQty);
+}
+
 function renderClienteVenta() {
   const wrap = document.getElementById('venta-cliente-resultado');
   if (!clienteVentaActual) {
@@ -1041,21 +1046,26 @@ function renderClienteVenta() {
     html += `<div class="prod-row"><div class="prod-name" style="flex:1;">${c.nombre || 'Sin nombre'}</div><div class="stock-num" style="color:var(--orange-dark);">${c.puntos} pts</div></div>`;
   }
 
-  const disponibles = STATE.premios.filter(p => c.puntos >= p.costoPuntos);
-  const noDisponibles = STATE.premios.filter(p => c.puntos < p.costoPuntos);
+  const alcanzaPuntos = p => c.puntos >= p.costoPuntos;
+  const disponibles = STATE.premios.filter(p => alcanzaPuntos(p) && pedidoAlcanzaParaPremio(p));
+  const sinPuntos = STATE.premios.filter(p => !alcanzaPuntos(p));
+  const sinCoincidir = STATE.premios.filter(p => alcanzaPuntos(p) && !pedidoAlcanzaParaPremio(p));
 
   if (STATE.premios.length > 0) {
     html += '<p class="muted" style="font-weight:700; margin:10px 0 6px; font-size:12px; text-transform:uppercase;">Premios disponibles</p>';
     if (disponibles.length === 0) {
-      html += '<p class="muted">Todavía no le alcanzan los puntos para ningún premio.</p>';
+      html += '<p class="muted">Ningún premio aplica a este pedido todavía.</p>';
     } else {
       html += disponibles.map(p => {
         const activo = premioSeleccionadoVenta && premioSeleccionadoVenta.id === p.id;
         return `<div class="qty-btn" style="text-align:left; ${activo?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="seleccionarPremioVenta('${p.id}')">${p.nombre}<span class="p">${p.costoPuntos} pts</span></div>`;
       }).join('');
     }
-    if (noDisponibles.length > 0) {
-      html += noDisponibles.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">Faltan ${p.costoPuntos - c.puntos} pts</span></div>`).join('');
+    if (sinCoincidir.length > 0) {
+      html += sinCoincidir.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">No hay ${PRODUCTS[p.prod]?PRODUCTS[p.prod].label:''} suficiente en este pedido</span></div>`).join('');
+    }
+    if (sinPuntos.length > 0) {
+      html += sinPuntos.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">Faltan ${p.costoPuntos - c.puntos} pts</span></div>`).join('');
     }
   }
   wrap.innerHTML = html;
@@ -1228,18 +1238,18 @@ async function confirmarVenta() {
     } else if (premioSeleccionadoVenta.tipo === 'descuento_monto') {
       aplicarDescuentoAItems(items, Math.min(premioSeleccionadoVenta.valor, subtotalOriginal));
     } else if (premioSeleccionadoVenta.tipo === 'producto_gratis') {
-      const disponible = stockDisponiblePedido(premioSeleccionadoVenta.prod);
-      if (disponible < premioSeleccionadoVenta.cantidadQty) {
-        showToast('No hay stock suficiente para entregar el premio "' + premioSeleccionadoVenta.nombre + '"');
+      // Busca un ítem YA escaneado en este pedido que coincida en producto y
+      // tenga cantidad suficiente, y le descuenta el valor de esa parte.
+      // No agrega ninguna bolsita nueva: la que ya está en el pedido pasa a
+      // costar menos (o nada), coincidiendo con lo que de verdad se entrega.
+      const objetivo = items.find(it => it.prod === premioSeleccionadoVenta.prod && it.qty >= premioSeleccionadoVenta.cantidadQty);
+      if (!objetivo) {
+        showToast('Ese premio no aplica a este pedido (no coincide con lo escaneado)');
         return;
       }
-      items.push({
-        prod: premioSeleccionadoVenta.prod,
-        optKey: premioSeleccionadoVenta.cantidadKey,
-        qty: premioSeleccionadoVenta.cantidadQty,
-        label: premioSeleccionadoVenta.cantidadLabel + ' (canje)',
-        monto: 0
-      });
+      const valorGratis = precioFor(premioSeleccionadoVenta.prod, premioSeleccionadoVenta.cantidadKey);
+      objetivo.monto = Math.max(0, objetivo.monto - valorGratis);
+      objetivo.label += ' (parte canjeada: ' + premioSeleccionadoVenta.cantidadLabel + ' gratis)';
     }
   }
 
