@@ -430,9 +430,63 @@ function renderPrecios() {
   document.getElementById('p-sandwich-unidad').value = pr.sandwich.unidad ? pr.sandwich.unidad.toLocaleString('es-AR') : '';
   document.getElementById('p-envio-cerca').value = pr.envio.cerca ? pr.envio.cerca.toLocaleString('es-AR') : '';
   document.getElementById('p-envio-lejos').value = pr.envio.lejos ? pr.envio.lejos.toLocaleString('es-AR') : '';
+  ['p-chipa-media', 'p-chipa-docena', 'p-chipa-docenaymedia', 'p-factura-media', 'p-factura-docena', 'p-factura-docenaymedia', 'p-sandwich-unidad', 'p-envio-cerca', 'p-envio-lejos'].forEach(id => {
+    document.getElementById(id).style.borderColor = 'var(--border)';
+  });
 }
 
 async function guardarPrecios() {
+  const campos = [{
+      id: 'p-chipa-media',
+      label: 'Chipá - Media docena'
+    },
+    {
+      id: 'p-chipa-docena',
+      label: 'Chipá - Una docena'
+    },
+    {
+      id: 'p-chipa-docenaymedia',
+      label: 'Chipá - Docena y media'
+    },
+    {
+      id: 'p-factura-media',
+      label: 'Factura - Media docena'
+    },
+    {
+      id: 'p-factura-docena',
+      label: 'Factura - Una docena'
+    },
+    {
+      id: 'p-factura-docenaymedia',
+      label: 'Factura - Docena y media'
+    },
+    {
+      id: 'p-sandwich-unidad',
+      label: 'Sándwich - Precio unidad'
+    },
+    {
+      id: 'p-envio-cerca',
+      label: 'Envío cerca'
+    },
+    {
+      id: 'p-envio-lejos',
+      label: 'Envío lejos'
+    },
+  ];
+
+  // Validar que TODOS los campos tengan un valor mayor a 0 antes de guardar nada
+  const faltantes = campos.filter(c => parseMiles(document.getElementById(c.id).value) <= 0);
+  if (faltantes.length > 0) {
+    showToast('Faltan precios: ' + faltantes.map(c => c.label).join(', '));
+    // Resaltar en rojo los campos vacíos para que se vean de un vistazo
+    campos.forEach(c => {
+      const el = document.getElementById(c.id);
+      const vacio = parseMiles(el.value) <= 0;
+      el.style.borderColor = vacio ? 'var(--red)' : 'var(--border)';
+    });
+    return;
+  }
+
   STATE.precios.chipa.media = parseMiles(document.getElementById('p-chipa-media').value);
   STATE.precios.chipa.docena = parseMiles(document.getElementById('p-chipa-docena').value);
   STATE.precios.chipa.docenaymedia = parseMiles(document.getElementById('p-chipa-docenaymedia').value);
@@ -601,16 +655,29 @@ function abrirRemisMov(tipo) {
   document.getElementById('remis-mov-title').textContent = tipo === 'ingreso' ? 'Registrar ingreso' : 'Registrar gasto';
   document.getElementById('remis-mov-btn').className = 'btn btn-block ' + (tipo === 'ingreso' ? 'btn-green' : 'btn-rust');
   document.getElementById('remis-mov-monto').value = '';
+  document.getElementById('remis-mov-monto').style.borderColor = 'var(--border)';
   document.getElementById('remis-mov-concepto').value = '';
+  document.getElementById('remis-mov-concepto').style.borderColor = 'var(--border)';
   document.getElementById('overlay-remis-mov').classList.add('show');
 }
 async function confirmarRemisMov() {
-  const monto = parseMiles(document.getElementById('remis-mov-monto').value);
-  if (!monto || monto <= 0) {
-    showToast('Ingresá un monto válido');
+  const montoInput = document.getElementById('remis-mov-monto');
+  const conceptoInput = document.getElementById('remis-mov-concepto');
+  const monto = parseMiles(montoInput.value);
+  const concepto = conceptoInput.value.trim();
+
+  let faltantes = [];
+  if (!monto || monto <= 0) faltantes.push('Monto');
+  if (!concepto) faltantes.push('Concepto');
+
+  montoInput.style.borderColor = (!monto || monto <= 0) ? 'var(--red)' : 'var(--border)';
+  conceptoInput.style.borderColor = !concepto ? 'var(--red)' : 'var(--border)';
+
+  if (faltantes.length > 0) {
+    showToast('Completá: ' + faltantes.join(', '));
     return;
   }
-  const concepto = document.getElementById('remis-mov-concepto').value.trim();
+
   const ok = await addRemisMov({
     ts: Date.now(),
     tipo: remisMovTipo,
@@ -707,12 +774,17 @@ function iniciarVenta(prod, optKey) {
     showToast('No hay suficiente stock de ' + PRODUCTS[prod].label);
     return;
   }
+  const precio = precioFor(prod, optKey);
+  if (!precio || precio <= 0) {
+    showToast('Falta cargar el precio de ' + PRODUCTS[prod].label + ' (' + opt.label + ') en Precios');
+    return;
+  }
   pendingSale = {
     prod,
     optKey,
     qty: opt.qty,
     label: opt.label,
-    monto: precioFor(prod, optKey)
+    monto: precio
   };
   const body = document.getElementById('confirm-body');
   body.innerHTML = `
@@ -800,15 +872,19 @@ function cargaManual(prod) {
   document.getElementById('carga-manual-title').textContent = 'Cargar ' + p.label;
   document.getElementById('carga-manual-label').textContent = 'Cantidad (' + p.unit + ')';
   document.getElementById('carga-manual-input').value = '';
+  document.getElementById('carga-manual-input').style.borderColor = 'var(--border)';
   document.getElementById('carga-manual-input').step = p.unit === 'docenas' ? '0.5' : '1';
   document.getElementById('overlay-carga-manual').classList.add('show');
 }
 async function confirmarCargaManual() {
-  const val = Number(document.getElementById('carga-manual-input').value);
+  const input = document.getElementById('carga-manual-input');
+  const val = Number(input.value);
   if (!val || val <= 0) {
+    input.style.borderColor = 'var(--red)';
     showToast('Ingresá una cantidad válida');
     return;
   }
+  input.style.borderColor = 'var(--border)';
   STATE.stock[cargaManualProd] = (STATE.stock[cargaManualProd] || 0) + val;
   const ok = await saveStock();
   if (ok) {
@@ -825,6 +901,7 @@ let bolsaManualProd = null;
 function abrirCargaBolsaManual() {
   bolsaManualProd = null;
   document.getElementById('bolsa-manual-input').value = 1;
+  document.getElementById('bolsa-manual-input').style.borderColor = 'var(--border)';
   actualizarSeleccionBolsa();
   actualizarPreviewBolsa();
   document.getElementById('overlay-carga-bolsa-manual').classList.add('show');
@@ -838,6 +915,8 @@ function seleccionarProductoBolsa(prod) {
 function actualizarSeleccionBolsa() {
   document.getElementById('bolsa-manual-chipa').style.background = bolsaManualProd === 'chipa' ? 'var(--orange-soft)' : '';
   document.getElementById('bolsa-manual-factura').style.background = bolsaManualProd === 'factura' ? 'var(--orange-soft)' : '';
+  document.getElementById('bolsa-manual-chipa').style.borderColor = 'var(--border)';
+  document.getElementById('bolsa-manual-factura').style.borderColor = 'var(--border)';
 }
 
 function actualizarPreviewBolsa() {
@@ -845,13 +924,18 @@ function actualizarPreviewBolsa() {
   document.getElementById('bolsa-manual-preview').textContent = '= ' + (bolsas * 18) + ' docenas';
 }
 async function confirmarCargaBolsaManual() {
-  if (!bolsaManualProd) {
-    showToast('Elegí primero el producto: chipá o factura');
-    return;
-  }
-  const bolsas = Number(document.getElementById('bolsa-manual-input').value);
-  if (!bolsas || bolsas <= 0) {
-    showToast('Ingresá una cantidad válida');
+  const input = document.getElementById('bolsa-manual-input');
+  const bolsas = Number(input.value);
+  let faltantes = [];
+  if (!bolsaManualProd) faltantes.push('Producto (Chipá o Factura)');
+  if (!bolsas || bolsas <= 0) faltantes.push('Cantidad de bolsas');
+
+  document.getElementById('bolsa-manual-chipa').style.borderColor = !bolsaManualProd ? 'var(--red)' : 'var(--border)';
+  document.getElementById('bolsa-manual-factura').style.borderColor = !bolsaManualProd ? 'var(--red)' : 'var(--border)';
+  input.style.borderColor = (!bolsas || bolsas <= 0) ? 'var(--red)' : 'var(--border)';
+
+  if (faltantes.length > 0) {
+    showToast('Completá: ' + faltantes.join(', '));
     return;
   }
   const docenas = bolsas * 18;
@@ -875,14 +959,19 @@ function abrirEditarStock(prod) {
   document.getElementById('editar-stock-label').textContent = 'Cantidad (' + p.unit + ')';
   document.getElementById('editar-stock-input').step = p.unit === 'docenas' ? '0.5' : '1';
   document.getElementById('editar-stock-input').value = STATE.stock[prod] || 0;
+  document.getElementById('editar-stock-input').style.borderColor = 'var(--border)';
   document.getElementById('overlay-editar-stock').classList.add('show');
 }
 async function confirmarEditarStock() {
-  const val = Number(document.getElementById('editar-stock-input').value);
-  if (val === null || val === undefined || isNaN(val) || val < 0) {
+  const input = document.getElementById('editar-stock-input');
+  const raw = input.value.trim();
+  const val = Number(raw);
+  if (raw === '' || isNaN(val) || val < 0) {
+    input.style.borderColor = 'var(--red)';
     showToast('Ingresá una cantidad válida');
     return;
   }
+  input.style.borderColor = 'var(--border)';
   STATE.stock[editarStockProd] = val;
   const ok = await saveStock();
   if (ok) {
