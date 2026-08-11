@@ -1105,63 +1105,71 @@ function stopCamera() {
 }
 
 function scanLoop() {
-  const video = document.getElementById('scanner-video');
-  const canvas = document.getElementById('scanner-canvas');
-  if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-    // Reducir el tamaño de la imagen que se analiza: procesar el video a
-    // resolución completa en cada cuadro es lento y hace que el escaneo
-    // se "trabe" sin nunca llegar a detectar el código. Con un tamaño
-    // más chico, se analizan muchos más cuadros por segundo.
-    const MAX_DIM = 720;
-    const scale = Math.min(1, MAX_DIM / Math.max(video.videoWidth, video.videoHeight));
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
-    const ctx = canvas.getContext('2d', {
-      willReadFrequently: true
-    });
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(img.data, img.width, img.height, {
-      inversionAttempts: 'attemptBoth'
-    });
-    if (code && code.data) {
-      handleScanResult(code.data);
+  try {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.getElementById('scanner-canvas');
+    if (typeof jsQR !== 'function') {
+      document.getElementById('scan-status').textContent = 'Error: no se pudo cargar el lector de QR (sin conexión a internet?). Revisá tu wifi/datos y volvé a entrar.';
       return;
     }
+    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+      const MAX_DIM = 720;
+      const scale = Math.min(1, MAX_DIM / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext('2d', {
+        willReadFrequently: true
+      });
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, {
+        inversionAttempts: 'attemptBoth'
+      });
+      if (code && code.data) {
+        handleScanResult(code.data);
+        return;
+      }
+    }
+    scannerLoopId = requestAnimationFrame(scanLoop);
+  } catch (errScan) {
+    document.getElementById('scan-status').textContent = 'Error al escanear: ' + (errScan.message || errScan);
   }
-  scannerLoopId = requestAnimationFrame(scanLoop);
 }
 
 function handleScanResult(text) {
-  const parts = text.trim().split(':');
-  if (parts[0] !== 'DOLDI') {
-    document.getElementById('scan-status').textContent = 'Código no reconocido, seguí intentando...';
-    scannerLoopId = requestAnimationFrame(scanLoop);
-    return;
-  }
-  const tipo = parts[1]; // VENTA | CARGA
-  const prodRaw = (parts[2] || '').toLowerCase();
-  const prodMap = {
-    chipa: 'chipa',
-    factura: 'factura',
-    sandwich: 'sandwich'
-  };
-  const prod = prodMap[prodRaw];
-  if (!prod) {
-    document.getElementById('scan-status').textContent = 'Código no reconocido.';
-    scannerLoopId = requestAnimationFrame(scanLoop);
-    return;
-  }
-  cerrarScanner();
-  if (tipo === 'VENTA') {
-    abrirSelectorCantidad(prod);
-  } else if (tipo === 'CARGA') {
-    const cant = Number(parts[3]) || 18;
-    STATE.stock[prod] = (STATE.stock[prod] || 0) + cant;
-    saveStock();
-    showToast('+ ' + cant + ' docenas de ' + PRODUCTS[prod].label + ' cargadas ✓');
-    renderStock();
-    renderVender();
+  try {
+    const parts = text.trim().split(':');
+    if (parts[0] !== 'DOLDI') {
+      document.getElementById('scan-status').textContent = 'Código no reconocido, seguí intentando...';
+      scannerLoopId = requestAnimationFrame(scanLoop);
+      return;
+    }
+    const tipo = parts[1]; // VENTA | CARGA
+    const prodRaw = (parts[2] || '').toLowerCase();
+    const prodMap = {
+      chipa: 'chipa',
+      factura: 'factura',
+      sandwich: 'sandwich'
+    };
+    const prod = prodMap[prodRaw];
+    if (!prod) {
+      document.getElementById('scan-status').textContent = 'Código no reconocido.';
+      scannerLoopId = requestAnimationFrame(scanLoop);
+      return;
+    }
+    cerrarScanner();
+    if (tipo === 'VENTA') {
+      abrirSelectorCantidad(prod);
+    } else if (tipo === 'CARGA') {
+      const cant = Number(parts[3]) || 18;
+      STATE.stock[prod] = (STATE.stock[prod] || 0) + cant;
+      saveStock();
+      showToast('+ ' + cant + ' docenas de ' + PRODUCTS[prod].label + ' cargadas ✓');
+      renderStock();
+      renderVender();
+    }
+  } catch (errHandle) {
+    showToast('Error al procesar el QR: ' + (errHandle.message || errHandle));
   }
 }
 
