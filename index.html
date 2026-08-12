@@ -602,6 +602,18 @@
     </div>
   </div>
 
+  <!-- CONFIRMAR ELIMINAR CLIENTE -->
+  <div class="overlay" id="overlay-confirm-eliminar-cliente">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-confirm-eliminar-cliente')">✕</button>
+      <h3 style="color:var(--red);">Eliminar cliente</h3>
+      <p class="muted" id="confirm-eliminar-cliente-texto" style="margin-top:8px; font-size:14px;"></p>
+      <p class="muted" style="margin-top:8px; font-weight:700; color:var(--red);">Esta acción no se puede deshacer.</p>
+      <button class="btn btn-rust btn-block" style="margin-top:16px;" id="confirm-eliminar-cliente-btn">Sí, eliminar</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="cerrarModal('overlay-confirm-eliminar-cliente')">Cancelar</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="script.js"></script>

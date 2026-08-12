@@ -1015,10 +1015,15 @@ async function eliminarCliente(dni) {
 }
 
 async function eliminarClienteUI(dni, nombre) {
-  const ok = window.confirm('¿Eliminar a ' + (nombre || 'este cliente') + ' (DNI ' + dni + ')? Esta acción no se puede deshacer.');
-  if (!ok) return;
-  const eliminado = await eliminarCliente(dni);
-  if (eliminado) showToast('Cliente eliminado');
+  const texto = document.getElementById('confirm-eliminar-cliente-texto');
+  texto.textContent = '¿Eliminar a ' + (nombre || 'este cliente') + ' (DNI ' + dni + ')?';
+  const btn = document.getElementById('confirm-eliminar-cliente-btn');
+  btn.onclick = async () => {
+    cerrarModal('overlay-confirm-eliminar-cliente');
+    const eliminado = await eliminarCliente(dni);
+    if (eliminado) showToast('Cliente eliminado');
+  };
+  document.getElementById('overlay-confirm-eliminar-cliente').classList.add('show');
 }
 
 function buscarClienteEnMemoria(dni) {
