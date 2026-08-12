@@ -106,7 +106,9 @@ let STATE = {
   precios: JSON.parse(JSON.stringify(DEFAULT_PRECIOS)),
   ventas: [],
   remis: [],
-  premios: []
+  premios: [],
+  clientes: [],
+  puntosPorMil: 1
 };
 let scannerStream = null;
 let scannerLoopId = null;
@@ -183,8 +185,24 @@ function attachListeners() {
       ...d.data()
     }));
     renderPremios();
+    renderClienteVenta();
   }, () => {
     showToast('No se pudo leer el catálogo de premios');
+  });
+  db.collection('doldichipa_clientes').onSnapshot(snap => {
+    STATE.clientes = snap.docs.map(d => ({
+      dni: d.id,
+      ...d.data()
+    }));
+    renderListaClientes();
+  }, () => {
+    showToast('No se pudo leer la lista de clientes');
+  });
+  db.collection('doldichipa').doc('puntosConfig').onSnapshot(doc => {
+    STATE.puntosPorMil = doc.exists && doc.data().porMil ? doc.data().porMil : 1;
+    renderConfigPuntos();
+  }, () => {
+    showToast('No se pudo leer la configuración de puntos');
   });
 }
 
@@ -326,6 +344,31 @@ async function guardarCliente(dni, data) {
   }
 }
 
+async function guardarConfigPuntos() {
+  const input = document.getElementById('config-puntos-input');
+  const val = Number(input.value);
+  if (!val || val <= 0) {
+    input.style.borderColor = 'var(--red)';
+    showToast('Ingresá un número válido');
+    return;
+  }
+  input.style.borderColor = 'var(--border)';
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    await db.collection('doldichipa').doc('puntosConfig').set({
+      porMil: val
+    }, {
+      merge: true
+    });
+    showToast('Configuración guardada ✓');
+  } catch (e) {
+    showToast('No se pudo guardar');
+  }
+}
+
 async function addPremio(premio) {
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
@@ -454,8 +497,9 @@ function irATab(name) {
   else if (name === 'vender') renderVender();
   else if (name === 'clientes') {
     renderPremios();
-    document.getElementById('cliente-buscar-dni').value = '';
-    document.getElementById('cliente-buscar-resultado').innerHTML = '';
+    renderConfigPuntos();
+    document.getElementById('clientes-buscar-input').value = '';
+    renderListaClientes();
   }
 }
 
@@ -867,15 +911,11 @@ function abrirPremioForm() {
 
 function seleccionarTipoPremio(tipo) {
   tipoPremioActual = tipo;
-  ['envio_gratis', 'descuento_pct', 'descuento_monto', 'producto_gratis'].forEach(t => {
+  ['envio_gratis', 'producto_gratis'].forEach(t => {
     document.getElementById('premio-tipo-' + t).style.background = (t === tipo) ? 'var(--orange-soft)' : '';
   });
   const extra = document.getElementById('premio-campos-extra');
-  if (tipo === 'descuento_pct') {
-    extra.innerHTML = `<div class="row-input"><label>Porcentaje de descuento</label><div><input type="number" id="premio-valor" min="1" max="100" style="width:90px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;"><span class="prefix" style="margin-left:4px;">%</span></div></div>`;
-  } else if (tipo === 'descuento_monto') {
-    extra.innerHTML = `<div class="row-input"><label>Monto de descuento</label><div><span class="prefix">$</span><input type="text" inputmode="numeric" id="premio-valor" oninput="formatMiles(this)" style="width:120px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;"></div></div>`;
-  } else if (tipo === 'producto_gratis') {
+  if (tipo === 'producto_gratis') {
     extra.innerHTML = `
       <p class="muted" style="font-weight:700; margin:8px 0; font-size:12px; text-transform:uppercase;">Producto a regalar</p>
       <div class="grid3" style="margin-bottom:10px;">
@@ -930,14 +970,6 @@ async function guardarPremioForm() {
     tipo: tipoPremioActual,
     costoPuntos
   };
-  if (tipoPremioActual === 'descuento_pct' || tipoPremioActual === 'descuento_monto') {
-    const valor = parseMiles(document.getElementById('premio-valor').value) || Number(document.getElementById('premio-valor').value);
-    if (!valor || valor <= 0) {
-      showToast('Completá el valor del descuento');
-      return;
-    }
-    premio.valor = valor;
-  }
   if (tipoPremioActual === 'producto_gratis') {
     premio.prod = premioProdActual;
     premio.cantidadKey = premioCantidadActual.key;
@@ -966,50 +998,60 @@ function fmtFecha(ts) {
   });
 }
 
-async function buscarClienteUI() {
-  const dni = document.getElementById('cliente-buscar-dni').value.trim();
-  if (!dni) {
-    showToast('Ingresá un DNI');
+const DNI_MIN_DIGITOS = 6;
+
+function buscarClienteEnMemoria(dni) {
+  return STATE.clientes.find(c => c.dni === dni) || null;
+}
+
+function renderListaClientes() {
+  const wrap = document.getElementById('clientes-lista');
+  if (!wrap) return;
+  const termino = (document.getElementById('clientes-buscar-input') || {}).value || '';
+  const t = termino.trim().toLowerCase();
+  let lista = STATE.clientes.slice().sort((a, b) => (b.puntos || 0) - (a.puntos || 0));
+  if (t) {
+    lista = lista.filter(c => (c.nombre || '').toLowerCase().includes(t) || c.dni.includes(t));
+  }
+  if (lista.length === 0) {
+    wrap.innerHTML = '<div class="empty">' + (t ? 'No se encontró ningún cliente.' : 'Todavía no hay clientes cargados. Se crean solos al vender.') + '</div>';
     return;
   }
-  const wrap = document.getElementById('cliente-buscar-resultado');
-  wrap.innerHTML = '<div class="loading">Buscando...</div>';
-  const cliente = await buscarCliente(dni);
-  if (!cliente) {
-    wrap.innerHTML = '<div class="empty">No hay ningún cliente con ese DNI todavía. Se crea solo la primera vez que compra (poniendo su DNI al finalizar un pedido).</div>';
-    return;
-  }
-  const puntos = puntosVigentes(cliente);
-  const vencidos = puntos === 0 && (cliente.puntos || 0) > 0;
-  wrap.innerHTML = `
-    <div class="prod-row">
+  wrap.innerHTML = lista.map(c => {
+    const puntos = puntosVigentes(c);
+    return `<div class="prod-row">
       <div style="flex:1;">
-        <div class="prod-name">${cliente.nombre || 'Sin nombre'}</div>
-        <div class="unit-tag">DNI ${cliente.dni} · Última compra: ${fmtFecha(cliente.ultimaCompra)}</div>
+        <div class="prod-name">${c.nombre || 'Sin nombre'}</div>
+        <div class="unit-tag">DNI ${c.dni} · Última compra: ${fmtFecha(c.ultimaCompra)}</div>
       </div>
       <div class="stock-num" style="color:var(--orange-dark);">${puntos} pts</div>
-    </div>
-    ${vencidos ? '<p class="muted" style="color:var(--red); margin-top:6px;">Los puntos vencieron por inactividad.</p>' : ''}
-  `;
+    </div>`;
+  }).join('');
+}
+
+/* ================= CONFIGURACIÓN DE PUNTOS ================= */
+function renderConfigPuntos() {
+  const input = document.getElementById('config-puntos-input');
+  if (input) input.value = STATE.puntosPorMil;
 }
 
 let clienteVentaActual = null; // {dni, nombre, puntos, esNuevo}
 let premioSeleccionadoVenta = null;
 
-async function buscarClienteVenta() {
+function onInputClienteVenta() {
   const dni = document.getElementById('venta-cliente-dni').value.trim();
-  if (!dni) {
-    showToast('Ingresá un DNI');
+  if (dni.length < DNI_MIN_DIGITOS) {
+    clienteVentaActual = null;
+    premioSeleccionadoVenta = null;
+    renderClienteVenta();
     return;
   }
-  const wrap = document.getElementById('venta-cliente-resultado');
-  wrap.innerHTML = '<div class="loading">Buscando...</div>';
-  const cliente = await buscarCliente(dni);
-  if (cliente) {
+  const encontrado = buscarClienteEnMemoria(dni);
+  if (encontrado) {
     clienteVentaActual = {
       dni,
-      nombre: cliente.nombre || '',
-      puntos: puntosVigentes(cliente),
+      nombre: encontrado.nombre || '',
+      puntos: puntosVigentes(encontrado),
       esNuevo: false
     };
   } else {
@@ -1039,7 +1081,7 @@ function renderClienteVenta() {
   let html = '';
   if (c.esNuevo) {
     html += `
-      <p class="muted" style="margin:4px 0;">Cliente nuevo, se va a crear al confirmar.</p>
+      <p class="muted" style="margin:4px 0; color:var(--orange-dark); font-weight:600;">Cliente nuevo, se va a crear al confirmar el pedido.</p>
       <input type="text" id="venta-cliente-nombre" placeholder="Nombre (opcional)" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text); margin-bottom:8px;">
     `;
   } else {
@@ -1276,7 +1318,7 @@ async function confirmarVenta() {
 
   // Si hay un cliente cargado, sumar/descontar sus puntos también en paralelo
   if (clienteVentaActual) {
-    const puntosGanados = Math.floor(subtotalOriginal / 1000);
+    const puntosGanados = Math.floor(subtotalOriginal / 1000) * (STATE.puntosPorMil || 1);
     const nuevosPuntos = Math.max(0, clienteVentaActual.puntos - (premioSeleccionadoVenta ? premioSeleccionadoVenta.costoPuntos : 0) + puntosGanados);
     const datosCliente = {
       puntos: nuevosPuntos,

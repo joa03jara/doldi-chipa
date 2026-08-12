@@ -308,16 +308,22 @@
     <!-- CLIENTES Y PUNTOS -->
     <section class="tab-panel" id="tab-clientes">
       <div class="section-title">Clientes y puntos</div>
-      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">1 punto por cada $1.000 comprados. Los puntos vencen si el cliente no compra en 60 días.</p>
+      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Los puntos vencen si el cliente no compra en 60 días.</p>
 
       <div class="card">
-        <h2>Buscar cliente</h2>
+        <h2>Puntaje</h2>
         <div class="row-input">
-          <label>DNI</label>
-          <input type="text" inputmode="numeric" id="cliente-buscar-dni" placeholder="Ej: 30123456" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+          <label>Cada $1.000 gastados =</label>
+          <input type="number" id="config-puntos-input" min="1" step="1" style="width:70px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
         </div>
-        <button class="btn btn-gold btn-block" style="margin-top:10px;" onclick="buscarClienteUI()">Buscar</button>
-        <div id="cliente-buscar-resultado" style="margin-top:12px;"></div>
+        <p class="muted" style="margin:2px 0 0;">puntos</p>
+        <button class="btn btn-sm btn-gold" style="margin-top:10px;" onclick="guardarConfigPuntos()">Guardar</button>
+      </div>
+
+      <div class="card">
+        <h2>Clientes</h2>
+        <input type="text" id="clientes-buscar-input" placeholder="Buscar por nombre o DNI" oninput="renderListaClientes()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
+        <div id="clientes-lista"></div>
       </div>
 
       <div class="card">
@@ -469,9 +475,8 @@
       <p class="muted" style="margin:14px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Cliente (opcional, para sumar o canjear puntos)</p>
       <div class="row-input">
         <label>DNI</label>
-        <input type="text" inputmode="numeric" id="venta-cliente-dni" placeholder="Ej: 30123456" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+        <input type="text" inputmode="numeric" id="venta-cliente-dni" placeholder="Ej: 30123456" oninput="onInputClienteVenta()" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
       </div>
-      <button class="btn btn-sm btn-ghost btn-block" style="margin-top:8px;" onclick="buscarClienteVenta()">Buscar / crear cliente</button>
       <div id="venta-cliente-resultado" style="margin-top:10px;"></div>
 
       <p class="muted" style="margin:14px 0 6px; font-weight:600;">Envío</p>
@@ -492,8 +497,6 @@
       <p class="muted" style="font-weight:700; margin:14px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Tipo de premio</p>
       <div class="grid2" style="margin-bottom:12px;">
         <div class="qty-btn" id="premio-tipo-envio_gratis" onclick="seleccionarTipoPremio('envio_gratis')">Envío gratis</div>
-        <div class="qty-btn" id="premio-tipo-descuento_pct" onclick="seleccionarTipoPremio('descuento_pct')">Descuento %</div>
-        <div class="qty-btn" id="premio-tipo-descuento_monto" onclick="seleccionarTipoPremio('descuento_monto')">Descuento $ fijo</div>
         <div class="qty-btn" id="premio-tipo-producto_gratis" onclick="seleccionarTipoPremio('producto_gratis')">Producto gratis</div>
       </div>
 
