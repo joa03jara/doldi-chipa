@@ -1000,6 +1000,27 @@ function fmtFecha(ts) {
 
 const DNI_MIN_DIGITOS = 6;
 
+async function eliminarCliente(dni) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa_clientes').doc(dni).delete();
+    return true;
+  } catch (e) {
+    showToast('No se pudo eliminar el cliente');
+    return false;
+  }
+}
+
+async function eliminarClienteUI(dni, nombre) {
+  const ok = window.confirm('¿Eliminar a ' + (nombre || 'este cliente') + ' (DNI ' + dni + ')? Esta acción no se puede deshacer.');
+  if (!ok) return;
+  const eliminado = await eliminarCliente(dni);
+  if (eliminado) showToast('Cliente eliminado');
+}
+
 function buscarClienteEnMemoria(dni) {
   return STATE.clientes.find(c => c.dni === dni) || null;
 }
@@ -1025,6 +1046,15 @@ function renderListaClientes() {
         <div class="unit-tag">DNI ${c.dni} · Última compra: ${fmtFecha(c.ultimaCompra)}</div>
       </div>
       <div class="stock-num" style="color:var(--orange-dark);">${puntos} pts</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="eliminarClienteUI('${c.dni}', '${(c.nombre || '').replace(/'/g, "\\'")}')" aria-label="Eliminar cliente">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+        </svg>
+      </button>
     </div>`;
   }).join('');
 }
