@@ -310,28 +310,61 @@
       <div class="section-title">Clientes y puntos</div>
       <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Los puntos vencen si el cliente no compra en 60 días.</p>
 
-      <div class="card">
-        <h2>Puntaje</h2>
-        <div class="row-input">
-          <label>Cada $1.000 gastados =</label>
-          <input type="number" id="config-puntos-input" min="1" step="1" style="width:70px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+      <div class="acc-group">
+        <div class="acc-item">
+          <button class="acc-header" data-target="acc-clientes-puntaje" data-group="clientes" onclick="toggleAccordion('acc-clientes-puntaje','clientes')">
+            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3.5 2" />
+              </svg></span>
+            <span style="flex:1; text-align:left;">Puntaje</span>
+            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div class="acc-body" id="acc-clientes-puntaje" data-group="clientes">
+            <div class="row-input">
+              <label>Cada $1.000 gastados =</label>
+              <input type="number" id="config-puntos-input" min="1" step="1" style="width:70px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+            </div>
+            <button class="btn btn-sm btn-gold" style="margin-top:10px;" onclick="guardarConfigPuntos()">Guardar</button>
+          </div>
         </div>
-        <p class="muted" style="margin:2px 0 0;">puntos</p>
-        <button class="btn btn-sm btn-gold" style="margin-top:10px;" onclick="guardarConfigPuntos()">Guardar</button>
-      </div>
 
-      <div class="card">
-        <h2>Clientes</h2>
-        <input type="text" id="clientes-buscar-input" placeholder="Buscar por nombre o DNI" oninput="renderListaClientes()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
-        <div id="clientes-lista"></div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-          <h2 style="margin:0;">Catálogo de premios</h2>
-          <button class="btn btn-sm btn-ghost" onclick="abrirPremioForm()">+ Nuevo</button>
+        <div class="acc-item">
+          <button class="acc-header" data-target="acc-clientes-lista" data-group="clientes" onclick="toggleAccordion('acc-clientes-lista','clientes')">
+            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l2.6 6.5L21 9l-5 4.4L17.5 21 12 17.3 6.5 21 8 13.4 3 9l6.4-.5z" />
+              </svg></span>
+            <span style="flex:1; text-align:left;">Clientes</span>
+            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div class="acc-body" id="acc-clientes-lista" data-group="clientes">
+            <input type="text" id="clientes-buscar-input" placeholder="Buscar por nombre o DNI" oninput="renderListaClientes()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
+            <div id="clientes-lista"></div>
+          </div>
         </div>
-        <div id="premios-lista"></div>
+
+        <div class="acc-item">
+          <button class="acc-header" data-target="acc-clientes-premios" data-group="clientes" onclick="toggleAccordion('acc-clientes-premios','clientes')">
+            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.59 13.41L11 3.83 3.83 11l9.58 9.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83z" />
+                <circle cx="7.5" cy="7.5" r="1" />
+              </svg></span>
+            <span style="flex:1; text-align:left;">Catálogo de premios</span>
+            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div class="acc-body" id="acc-clientes-premios" data-group="clientes">
+            <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+              <button class="btn btn-sm btn-ghost" onclick="abrirPremioForm()">+ Nuevo</button>
+            </div>
+            <div id="premios-lista"></div>
+          </div>
+        </div>
       </div>
     </section>
 

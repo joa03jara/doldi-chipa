@@ -944,7 +944,7 @@ function seleccionarProdPremio(prod) {
     key: 'unidad',
     label: '1 unidad',
     qty: 1
-  }] : PRODUCTS[prod].opts;
+  }] : PRODUCTS[prod].opts.filter(o => o.key !== 'docenaymedia');
   premioCantidadActual = opts[0];
   wrap.innerHTML = '<div class="grid3">' + opts.map((o, i) => `<div class="qty-btn premio-cant-opt" data-idx="${i}" style="${i===0?'background:var(--orange-soft);':''}" onclick="seleccionarCantidadPremio(${i})">${o.label}</div>`).join('') + '</div>';
   wrap._opts = opts;
