@@ -1,109 +1,85 @@
-/* ================= ICONOS ================= */
-const ICONS = {
-  chipa: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="13" r="7.2"/><circle cx="9" cy="11" r="0.5" fill="currentColor" stroke="none"/><circle cx="14.5" cy="10.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="15.5" cy="14" r="0.5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15" r="0.5" fill="currentColor" stroke="none"/></svg>',
-  factura: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 15.5c1-6.5 5.5-10.5 10-10.5 4 0 6.5 2 6.5 4.7 0 2-1.8 3.3-4 3.3-1 3-4 5-7.5 5-2.3 0-5-.8-5-2.5z"/><path d="M9 8.5l1 3.2M13 7l1.2 3.3M16.5 8.5l1 2.6"/></svg>',
-  sandwich: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.5L12 4.5l8.5 7"/><path d="M4 11.5v3.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.2"/><path d="M3.5 11.5h17"/><path d="M7 16.7l1-2M12 16.7v-2M17 16.7l-1-2"/></svg>',
-  remis: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11.5l1.3-4A2 2 0 0 1 8.2 6.2h7.6a2 2 0 0 1 1.9 1.3l1.3 4"/><rect x="2.7" y="11.5" width="18.6" height="5.2" rx="1.6"/><circle cx="7.3" cy="18.7" r="1.6"/><circle cx="16.7" cy="18.7" r="1.6"/></svg>',
-};
-
-function icon(name, size) {
-  let svg = ICONS[name] || '';
-  if (size) svg = svg.replace('width="18" height="18"', `width="${size}" height="${size}"`);
-  return svg;
+/* ================= PRODUCTOS (dinámico) ================= */
+// Los productos ya no están fijos en el código: se cargan desde la nube
+// (colección doldichipa_productos) y se administran desde la pestaña "Productos".
+// La primera vez que se conecta una base de datos nueva, se crean automáticamente
+// los 3 productos originales (chipa, factura, sándwich) para no perder compatibilidad.
+function productosSemilla() {
+  return [{
+      id: 'chipa',
+      label: 'Chipá',
+      emoji: '🧀',
+      unit: 'docenas',
+      pricingMode: 'variantes',
+      variantes: [{
+          key: 'media',
+          label: 'Media docena',
+          qty: 0.5
+        },
+        {
+          key: 'docena',
+          label: 'Una docena',
+          qty: 1
+        },
+        {
+          key: 'docenaymedia',
+          label: 'Docena y media',
+          qty: 1.5
+        },
+      ],
+      packSize: 18,
+      packLabel: 'bolsa',
+      orden: 0
+    },
+    {
+      id: 'factura',
+      label: 'Factura',
+      emoji: '🥐',
+      unit: 'docenas',
+      pricingMode: 'variantes',
+      variantes: [{
+          key: 'media',
+          label: 'Media docena',
+          qty: 0.5
+        },
+        {
+          key: 'docena',
+          label: 'Una docena',
+          qty: 1
+        },
+        {
+          key: 'docenaymedia',
+          label: 'Docena y media',
+          qty: 1.5
+        },
+      ],
+      packSize: 18,
+      packLabel: 'bolsa',
+      orden: 1
+    },
+    {
+      id: 'sandwich',
+      label: 'Sándwich de chipá',
+      emoji: '🥪',
+      unit: 'unidades',
+      pricingMode: 'libre',
+      variantes: [],
+      packSize: null,
+      packLabel: null,
+      orden: 2
+    }
+  ];
 }
 
-const PRODUCTS = {
-  chipa: {
-    label: 'Chipá',
-    unit: 'docenas',
-    opts: [{
-        key: 'media',
-        label: 'Media docena',
-        qty: 0.5
-      },
-      {
-        key: 'docena',
-        label: 'Una docena',
-        qty: 1
-      },
-      {
-        key: 'docenaymedia',
-        label: 'Docena y media',
-        qty: 1.5
-      },
-    ]
-  },
-  factura: {
-    label: 'Factura',
-    unit: 'docenas',
-    opts: [{
-        key: 'media',
-        label: 'Media docena',
-        qty: 0.5
-      },
-      {
-        key: 'docena',
-        label: 'Una docena',
-        qty: 1
-      },
-      {
-        key: 'docenaymedia',
-        label: 'Docena y media',
-        qty: 1.5
-      },
-    ]
-  },
-  sandwich: {
-    label: 'Sándwich de chipá',
-    unit: 'unidades',
-    opts: [{
-        key: 'unidad',
-        label: '1 unidad',
-        qty: 1
-      },
-      {
-        key: 'u5',
-        label: '5 unidades',
-        qty: 5
-      },
-      {
-        key: 'u10',
-        label: '10 unidades',
-        qty: 10
-      },
-    ]
-  }
-};
-const DEFAULT_STOCK = {
-  chipa: 0,
-  factura: 0,
-  sandwich: 0
-};
-const DEFAULT_PRECIOS = {
-  chipa: {
-    media: 0,
-    docena: 0,
-    docenaymedia: 0
-  },
-  factura: {
-    media: 0,
-    docena: 0,
-    docenaymedia: 0
-  },
-  sandwich: {
-    unidad: 0
-  },
-  envio: {
-    cerca: 0,
-    lejos: 0
-  }
-};
+function prodIconHtml(id, size) {
+  const p = STATE.productos[id];
+  const emoji = (p && p.emoji) ? p.emoji : '📦';
+  return `<span style="font-size:${size||18}px; line-height:1;">${emoji}</span>`;
+}
 
 let STATE = {
-  stock: {
-    ...DEFAULT_STOCK
-  },
-  precios: JSON.parse(JSON.stringify(DEFAULT_PRECIOS)),
+  productos: {},
+  stock: {},
+  precios: {},
   ventas: [],
   remis: [],
   premios: [],
@@ -136,22 +112,56 @@ function updateConnStatus(ok) {
     'Sin conectar, los datos NO se comparten entre celulares y se pierden al cerrar.';
 }
 
+async function seedProductosSiHaceFalta() {
+  try {
+    const metaRef = db.collection('doldichipa').doc('productos_meta');
+    const metaDoc = await metaRef.get();
+    if (metaDoc.exists) return;
+    const batch = db.batch();
+    productosSemilla().forEach(def => {
+      const {
+        id,
+        ...resto
+      } = def;
+      batch.set(db.collection('doldichipa_productos').doc(id), resto);
+    });
+    batch.set(metaRef, {
+      seeded: true,
+      seededAt: Date.now()
+    });
+    await batch.commit();
+  } catch (e) {
+    // Si falla, el usuario simplemente ve la lista de productos vacía y puede
+    // cargarlos a mano desde la pestaña Productos.
+  }
+}
+
 function attachListeners() {
   if (!db) return;
+  seedProductosSiHaceFalta();
+  db.collection('doldichipa_productos').onSnapshot(snap => {
+    const nuevos = {};
+    snap.docs.forEach(d => {
+      nuevos[d.id] = {
+        id: d.id,
+        ...d.data()
+      };
+    });
+    STATE.productos = nuevos;
+    renderAll();
+    if (document.getElementById('tab-productos').classList.contains('active')) renderProductosLista();
+  }, () => {
+    showToast('No se pudo leer la lista de productos');
+  });
   db.collection('doldichipa').doc('stock').onSnapshot(doc => {
-    STATE.stock = doc.exists ? {
-      ...DEFAULT_STOCK,
-      ...doc.data()
-    } : {
-      ...DEFAULT_STOCK
-    };
+    STATE.stock = doc.exists ? doc.data() : {};
     renderVender();
     renderStock();
   }, () => {
     showToast('No se pudo leer el stock de la nube');
   });
   db.collection('doldichipa').doc('precios').onSnapshot(doc => {
-    STATE.precios = doc.exists ? doc.data() : JSON.parse(JSON.stringify(DEFAULT_PRECIOS));
+    STATE.precios = doc.exists ? doc.data() : {};
     renderVender();
     renderPrecios();
     renderStock();
@@ -405,8 +415,8 @@ function fmtMoney(n) {
   });
 }
 
-// Muestra docenas de forma compacta: 17.5 -> "17 ½", 0.5 -> "½", 17 -> "17"
-function fmtDocenasCorto(qty) {
+// Muestra una cantidad de forma compacta, sin unidad: 17.5 -> "17 ½", 0.5 -> "½", 17 -> "17"
+function fmtNumCorto(qty) {
   qty = Number(qty) || 0;
   const entero = Math.floor(qty);
   const media = (qty - entero) >= 0.49;
@@ -414,14 +424,25 @@ function fmtDocenasCorto(qty) {
   return entero + (media ? ' ½' : '');
 }
 
-// Muestra docenas en palabras: 17.5 -> "17 docenas y media", 0.5 -> "media docena"
-function fmtDocenasLargo(qty) {
-  qty = Number(qty) || 0;
-  const entero = Math.floor(qty);
-  const media = (qty - entero) >= 0.49;
-  if (entero === 0 && media) return 'media docena';
-  const base = entero + (entero === 1 ? ' docena' : ' docenas');
-  return media ? base + ' y media' : base;
+// Muestra una cantidad junto con la unidad del producto: 17.5 -> "17 ½ docenas"
+function fmtCantidad(prod, qty) {
+  const p = STATE.productos[prod];
+  const unit = p ? p.unit : 'unidades';
+  return fmtNumCorto(qty) + ' ' + unit;
+}
+
+// Precio de referencia "por unidad de stock" de un producto, usado para
+// proyectar cuánto vale el stock disponible.
+function precioRefPorUnidad(prod) {
+  const p = STATE.productos[prod];
+  const pr = STATE.precios[prod] || {};
+  if (!p) return 0;
+  if (p.pricingMode === 'libre') return pr.unidad || 0;
+  const uno = (p.variantes || []).find(v => v.qty === 1);
+  if (uno) return pr[uno.key] || 0;
+  const v0 = (p.variantes || [])[0];
+  if (v0 && v0.qty > 0) return (pr[v0.key] || 0) / v0.qty;
+  return 0;
 }
 
 function formatMiles(el) {
@@ -431,17 +452,6 @@ function formatMiles(el) {
 
 function parseMiles(val) {
   return Number(String(val || '').replace(/\D/g, '')) || 0;
-}
-
-function fmtQty(prod, qty) {
-  const unit = PRODUCTS[prod].unit;
-  if (unit === 'docenas') {
-    if (qty === 0.5) return 'media docena';
-    if (qty === 1) return '1 docena';
-    if (qty === 1.5) return 'docena y media';
-    return qty + ' docenas';
-  }
-  return qty + ' unidad' + (qty === 1 ? '' : 'es');
 }
 
 function showToast(msg) {
@@ -491,6 +501,7 @@ function irATab(name) {
   // (descarta cualquier texto escrito pero no guardado).
   if (name === 'precios') renderPrecios();
   else if (name === 'stock') renderStock();
+  else if (name === 'productos') renderProductosLista();
   else if (name === 'ventas') renderVentas();
   else if (name === 'remis') renderRemis();
   else if (name === 'resumen') renderResumen();
@@ -513,34 +524,285 @@ function renderAll() {
   renderResumen();
 }
 
+/* ================= PRODUCTOS (crear / editar / borrar) ================= */
+function renderProductosLista() {
+  const wrap = document.getElementById('productos-lista');
+  if (!wrap) return;
+  const ids = productosOrdenados();
+  if (ids.length === 0) {
+    wrap.innerHTML = '<div class="empty">Todavía no cargaste ningún producto.</div>';
+    return;
+  }
+  wrap.innerHTML = ids.map(id => {
+    const p = STATE.productos[id];
+    const detalle = p.pricingMode === 'libre' ?
+      ('Precio libre por ' + p.unit) :
+      ((p.variantes || []).length + ' opción' + ((p.variantes || []).length === 1 ? '' : 'es') + ' de venta');
+    return `<div class="product-item">
+      <div class="pi-emoji">${p.emoji || '📦'}</div>
+      <div style="flex:1;">
+        <div class="prod-name">${p.label}</div>
+        <div class="unit-tag">${p.unit} · ${detalle}</div>
+      </div>
+      <div class="pi-actions">
+        <button class="btn btn-sm btn-ghost" onclick="abrirProductoQR('${id}')">QR</button>
+        <button class="btn btn-sm btn-ghost" onclick="abrirProductoForm('${id}')">Editar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function slugify(str) {
+  const base = (str || '').toString().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return base || 'producto';
+}
+
+const EMOJIS_PRODUCTO = ['🧀', '🥐', '🥪', '🍔', '🍕', '🌭', '🥖', '🍞', '🥟', '🍗', '🍟', '🍩', '🍪', '🧁', '🍰', '🥤', '☕', '🍦', '🥗', '🍫', '📦'];
+
+let pfEditId = null;
+let pfEmojiActual = '📦';
+let pfModoActual = 'libre';
+let pfVariantesActual = [];
+
+function abrirProductoForm(editId) {
+  pfEditId = editId || null;
+  const grid = document.getElementById('pf-emoji-grid');
+  grid.innerHTML = EMOJIS_PRODUCTO.map(e => `<div class="emoji-opt" data-e="${e}" onclick="seleccionarEmojiForm('${e}')">${e}</div>`).join('');
+
+  document.getElementById('producto-form-title').textContent = editId ? 'Editar producto' : 'Nuevo producto';
+  document.getElementById('pf-eliminar-btn').style.display = editId ? 'block' : 'none';
+
+  if (editId && STATE.productos[editId]) {
+    const p = STATE.productos[editId];
+    document.getElementById('pf-nombre').value = p.label || '';
+    document.getElementById('pf-unidad').value = p.unit || '';
+    pfEmojiActual = p.emoji || '📦';
+    pfModoActual = p.pricingMode || 'libre';
+    pfVariantesActual = (p.variantes || []).map(v => ({ ...v
+    }));
+    document.getElementById('pf-usa-paquete').checked = !!p.packSize;
+    document.getElementById('pf-paquete-nombre').value = p.packLabel || '';
+    document.getElementById('pf-paquete-cantidad').value = p.packSize || '';
+  } else {
+    document.getElementById('pf-nombre').value = '';
+    document.getElementById('pf-unidad').value = 'unidades';
+    pfEmojiActual = '📦';
+    pfModoActual = 'libre';
+    pfVariantesActual = [{
+      key: 'v' + Date.now(),
+      label: '1 unidad',
+      qty: 1
+    }];
+    document.getElementById('pf-usa-paquete').checked = false;
+    document.getElementById('pf-paquete-nombre').value = '';
+    document.getElementById('pf-paquete-cantidad').value = '';
+  }
+  document.getElementById('pf-precio-unidad').value = '';
+
+  seleccionarEmojiForm(pfEmojiActual);
+  seleccionarModoPrecio(pfModoActual);
+  renderVariantesForm();
+  togglePaqueteForm();
+  document.getElementById('overlay-producto-form').classList.add('show');
+}
+
+function seleccionarEmojiForm(e) {
+  pfEmojiActual = e;
+  document.querySelectorAll('#pf-emoji-grid .emoji-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.e === e);
+  });
+}
+
+function seleccionarModoPrecio(modo) {
+  pfModoActual = modo;
+  document.getElementById('pf-modo-libre').classList.toggle('active', modo === 'libre');
+  document.getElementById('pf-modo-variantes').classList.toggle('active', modo === 'variantes');
+  document.getElementById('pf-precio-libre-wrap').style.display = modo === 'libre' ? 'block' : 'none';
+  document.getElementById('pf-variantes-wrap').style.display = modo === 'variantes' ? 'block' : 'none';
+}
+
+function renderVariantesForm() {
+  const wrap = document.getElementById('pf-variantes-list');
+  wrap.innerHTML = pfVariantesActual.map((v, i) => `
+    <div class="variante-row">
+      <input class="vr-label" type="text" placeholder="Nombre (ej: Docena)" value="${v.label||''}" oninput="pfVariantesActual[${i}].label=this.value">
+      <input class="vr-qty" type="number" step="0.5" min="0.01" placeholder="Cant." value="${v.qty||''}" oninput="pfVariantesActual[${i}].qty=Number(this.value)||0">
+      <button class="vr-del" onclick="eliminarVarianteForm(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function agregarVarianteForm() {
+  pfVariantesActual.push({
+    key: 'v' + Date.now() + Math.floor(Math.random() * 1000),
+    label: '',
+    qty: 1
+  });
+  renderVariantesForm();
+}
+
+function eliminarVarianteForm(i) {
+  pfVariantesActual.splice(i, 1);
+  renderVariantesForm();
+}
+
+function togglePaqueteForm() {
+  const on = document.getElementById('pf-usa-paquete').checked;
+  document.getElementById('pf-paquete-wrap').style.display = on ? 'block' : 'none';
+}
+
+async function guardarProducto(id, def) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa_productos').doc(id).set(def, {
+      merge: true
+    });
+    return true;
+  } catch (e) {
+    showToast('No se pudo guardar el producto');
+    return false;
+  }
+}
+
+async function guardarProductoForm() {
+  const nombre = document.getElementById('pf-nombre').value.trim();
+  const unidad = document.getElementById('pf-unidad').value.trim() || 'unidades';
+  if (!nombre) {
+    showToast('Ponele un nombre al producto');
+    return;
+  }
+  if (pfModoActual === 'variantes') {
+    pfVariantesActual = pfVariantesActual.filter(v => v.label && v.qty > 0);
+    if (pfVariantesActual.length === 0) {
+      showToast('Agregá al menos una opción de venta con nombre y cantidad');
+      return;
+    }
+  }
+  const usaPaquete = document.getElementById('pf-usa-paquete').checked;
+  const packLabel = document.getElementById('pf-paquete-nombre').value.trim();
+  const packSize = Number(document.getElementById('pf-paquete-cantidad').value) || 0;
+  if (usaPaquete && (!packLabel || packSize <= 0)) {
+    showToast('Completá el nombre y la cantidad del paquete');
+    return;
+  }
+
+  let id = pfEditId;
+  if (!id) {
+    const base = slugify(nombre);
+    id = base;
+    let i = 2;
+    while (STATE.productos[id]) {
+      id = base + '_' + i;
+      i++;
+    }
+  }
+
+  const def = {
+    label: nombre,
+    emoji: pfEmojiActual,
+    unit: unidad,
+    pricingMode: pfModoActual,
+    variantes: pfModoActual === 'variantes' ? pfVariantesActual.map(v => ({
+      key: v.key,
+      label: v.label,
+      qty: Number(v.qty)
+    })) : [],
+    packSize: usaPaquete ? packSize : null,
+    packLabel: usaPaquete ? packLabel : null,
+    orden: (STATE.productos[id] && STATE.productos[id].orden != null) ? STATE.productos[id].orden : Object.keys(STATE.productos).length
+  };
+
+  const ok = await guardarProducto(id, def);
+  if (ok) {
+    cerrarModal('overlay-producto-form');
+    showToast('Producto guardado ✓');
+  }
+}
+
+function confirmarEliminarProducto() {
+  if (!pfEditId) return;
+  const p = STATE.productos[pfEditId];
+  const nombre = p ? p.label : pfEditId;
+  if (!confirm('¿Eliminar "' + nombre + '"? El stock y las ventas ya registradas no se borran, pero el producto va a dejar de aparecer para vender.')) return;
+  eliminarProductoUI(pfEditId);
+}
+
+async function eliminarProductoUI(id) {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    await db.collection('doldichipa_productos').doc(id).delete();
+    cerrarModal('overlay-producto-form');
+    showToast('Producto eliminado');
+  } catch (e) {
+    showToast('No se pudo eliminar el producto');
+  }
+}
+
+function abrirProductoQR(id) {
+  const p = STATE.productos[id];
+  if (!p) return;
+  document.getElementById('producto-qr-title').textContent = p.label + ' — Códigos QR';
+  const ventaTxt = 'DOLDI:VENTA:' + id;
+  const cargaCant = p.packSize || 1;
+  const cargaTxt = 'DOLDI:CARGA:' + id + ':' + cargaCant;
+  document.getElementById('producto-qr-carga-label').textContent = p.packSize ?
+    ('Código de carga (1 ' + (p.packLabel || 'paquete') + ' = ' + p.packSize + ' ' + p.unit + ')') :
+    ('Código de carga (agrega 1 ' + p.unit.replace(/s$/, '') + ')');
+  try {
+    if (typeof QRCode !== 'undefined') {
+      QRCode.toCanvas(document.getElementById('producto-qr-venta'), ventaTxt, {
+        width: 200
+      });
+      QRCode.toCanvas(document.getElementById('producto-qr-carga'), cargaTxt, {
+        width: 200
+      });
+    } else {
+      showToast('No se pudo cargar el generador de QR (revisá tu conexión a internet)');
+    }
+  } catch (e) {
+    showToast('No se pudo generar el QR');
+  }
+  document.getElementById('overlay-producto-qr').classList.add('show');
+}
+
 function renderVender() {
   // La pestaña Vender ya no muestra resumen de stock (se sacó a pedido).
 }
 
 function precioFor(prod, optKey) {
   const pr = STATE.precios[prod];
-  if (!pr) return 0;
-  if (optKey === 'media') return pr.media || 0;
-  if (optKey === 'docena') return pr.docena || 0;
-  if (optKey === 'docenaymedia') return pr.docenaymedia || 0;
-  if (optKey === 'unidad') return pr.unidad || 0;
-  if (optKey === 'u5') return (pr.unidad || 0) * 5;
-  if (optKey === 'u10') return (pr.unidad || 0) * 10;
-  return 0;
+  const p = STATE.productos[prod];
+  if (!pr || !p) return 0;
+  if (p.pricingMode === 'libre') return pr.unidad || 0;
+  return pr[optKey] || 0;
+}
+
+function productosOrdenados() {
+  return Object.keys(STATE.productos).sort((a, b) => (STATE.productos[a].orden || 0) - (STATE.productos[b].orden || 0));
 }
 
 function renderStock() {
   const wrap = document.getElementById('stock-card');
+  const ids = productosOrdenados();
   let html = '<h2>Disponible ahora</h2><p class="muted" style="margin-top:-6px;">Tocá un producto para corregir la cantidad.</p>';
-  Object.keys(PRODUCTS).forEach(prod => {
-    const p = PRODUCTS[prod];
+  if (ids.length === 0) html += '<div class="empty">Todavía no cargaste productos. Andá a la pestaña Productos.</div>';
+  ids.forEach(prod => {
+    const p = STATE.productos[prod];
     const val = STATE.stock[prod] || 0;
-    const low = (p.unit === 'docenas' && val < 1) || (p.unit === 'unidades' && val < 3);
-    const valMostrar = p.unit === 'docenas' ? fmtDocenasCorto(val) : val;
+    const low = p.packSize ? val < 1 : val < 3;
     html += `<div class="prod-row" style="cursor:pointer;" onclick="abrirEditarStock('${prod}')">
-      <div class="prod-icon">${icon(prod)}</div>
+      <div class="prod-icon">${prodIconHtml(prod)}</div>
       <div style="flex:1;"><div class="prod-name">${p.label}</div><div class="unit-tag">${p.unit}</div></div>
-      <div class="stock-num ${low?'low':''}">${valMostrar}</div>
+      <div class="stock-num ${low?'low':''}">${fmtNumCorto(val)}</div>
       <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </div>`;
   });
@@ -549,18 +811,12 @@ function renderStock() {
   const proy = document.getElementById('proyeccion');
   let total = 0;
   let rows = '';
-  Object.keys(PRODUCTS).forEach(prod => {
-    const p = PRODUCTS[prod];
+  ids.forEach(prod => {
+    const p = STATE.productos[prod];
     const val = STATE.stock[prod] || 0;
-    let precioDocena;
-    if (p.unit === 'docenas') {
-      precioDocena = STATE.precios[prod].docena || 0;
-    } else {
-      precioDocena = STATE.precios[prod].unidad || 0;
-    }
-    const monto = val * precioDocena;
+    const monto = val * precioRefPorUnidad(prod);
     total += monto;
-    rows += `<div class="prod-row"><div class="prod-icon">${icon(prod)}</div><div style="flex:1;" class="prod-name">${p.label}</div><div class="stock-num">${fmtMoney(monto)}</div></div>`;
+    rows += `<div class="prod-row"><div class="prod-icon">${prodIconHtml(prod)}</div><div style="flex:1;" class="prod-name">${p.label}</div><div class="stock-num">${fmtMoney(monto)}</div></div>`;
   });
   proy.innerHTML = rows + `<div class="prod-row"><div class="prod-name" style="flex:1;">Total proyectado</div><div class="stock-num" style="color:var(--orange-dark)">${fmtMoney(total)}</div></div>`;
 
@@ -569,84 +825,103 @@ function renderStock() {
 }
 
 function renderPrecios() {
+  const wrap = document.getElementById('precios-productos');
+  if (!wrap) return;
   const pr = STATE.precios;
-  document.getElementById('p-chipa-media').value = pr.chipa.media ? pr.chipa.media.toLocaleString('es-AR') : '';
-  document.getElementById('p-chipa-docena').value = pr.chipa.docena ? pr.chipa.docena.toLocaleString('es-AR') : '';
-  document.getElementById('p-chipa-docenaymedia').value = pr.chipa.docenaymedia ? pr.chipa.docenaymedia.toLocaleString('es-AR') : '';
-  document.getElementById('p-factura-media').value = pr.factura.media ? pr.factura.media.toLocaleString('es-AR') : '';
-  document.getElementById('p-factura-docena').value = pr.factura.docena ? pr.factura.docena.toLocaleString('es-AR') : '';
-  document.getElementById('p-factura-docenaymedia').value = pr.factura.docenaymedia ? pr.factura.docenaymedia.toLocaleString('es-AR') : '';
-  document.getElementById('p-sandwich-unidad').value = pr.sandwich.unidad ? pr.sandwich.unidad.toLocaleString('es-AR') : '';
-  document.getElementById('p-envio-cerca').value = pr.envio.cerca ? pr.envio.cerca.toLocaleString('es-AR') : '';
-  document.getElementById('p-envio-lejos').value = pr.envio.lejos ? pr.envio.lejos.toLocaleString('es-AR') : '';
-  ['p-chipa-media', 'p-chipa-docena', 'p-chipa-docenaymedia', 'p-factura-media', 'p-factura-docena', 'p-factura-docenaymedia', 'p-sandwich-unidad', 'p-envio-cerca', 'p-envio-lejos'].forEach(id => {
-    document.getElementById(id).style.borderColor = 'var(--border)';
+  const ids = productosOrdenados();
+  wrap.innerHTML = ids.map(prod => {
+    const p = STATE.productos[prod];
+    const accId = 'acc-precio-' + prod;
+    let rows;
+    if (p.pricingMode === 'libre') {
+      rows = `<div class="row-input"><label>Precio por ${p.unit}</label>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-unidad" oninput="formatMiles(this)"></div>
+      </div>`;
+    } else {
+      rows = (p.variantes || []).map(v => `<div class="row-input"><label>${v.label}</label>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-${v.key}" oninput="formatMiles(this)"></div>
+      </div>`).join('');
+    }
+    return `<div class="acc-item">
+      <button class="acc-header" data-target="${accId}" data-group="precios" onclick="toggleAccordion('${accId}','precios')">
+        <span class="h2-icon">${prodIconHtml(prod, 18)}</span>
+        <span style="flex:1; text-align:left;">${p.label}</span>
+        <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="acc-body" id="${accId}" data-group="precios">${rows}</div>
+    </div>`;
+  }).join('');
+
+  ids.forEach(prod => {
+    const p = STATE.productos[prod];
+    const precProd = pr[prod] || {};
+    if (p.pricingMode === 'libre') {
+      const el = document.getElementById('p-' + prod + '-unidad');
+      if (el) el.value = precProd.unidad ? precProd.unidad.toLocaleString('es-AR') : '';
+    } else {
+      (p.variantes || []).forEach(v => {
+        const el = document.getElementById('p-' + prod + '-' + v.key);
+        if (el) el.value = precProd[v.key] ? precProd[v.key].toLocaleString('es-AR') : '';
+      });
+    }
   });
+  const envio = pr.envio || {};
+  document.getElementById('p-envio-cerca').value = envio.cerca ? envio.cerca.toLocaleString('es-AR') : '';
+  document.getElementById('p-envio-lejos').value = envio.lejos ? envio.lejos.toLocaleString('es-AR') : '';
+  document.getElementById('p-envio-cerca').style.borderColor = 'var(--border)';
+  document.getElementById('p-envio-lejos').style.borderColor = 'var(--border)';
 }
 
 async function guardarPrecios() {
-  const campos = [{
-      id: 'p-chipa-media',
-      label: 'Chipá - Media docena'
-    },
-    {
-      id: 'p-chipa-docena',
-      label: 'Chipá - Una docena'
-    },
-    {
-      id: 'p-chipa-docenaymedia',
-      label: 'Chipá - Docena y media'
-    },
-    {
-      id: 'p-factura-media',
-      label: 'Factura - Media docena'
-    },
-    {
-      id: 'p-factura-docena',
-      label: 'Factura - Una docena'
-    },
-    {
-      id: 'p-factura-docenaymedia',
-      label: 'Factura - Docena y media'
-    },
-    {
-      id: 'p-sandwich-unidad',
-      label: 'Sándwich - Precio unidad'
-    },
-    {
-      id: 'p-envio-cerca',
-      label: 'Envío cerca'
-    },
-    {
-      id: 'p-envio-lejos',
-      label: 'Envío lejos'
-    },
-  ];
+  const campos = [];
+  productosOrdenados().forEach(prod => {
+    const p = STATE.productos[prod];
+    if (p.pricingMode === 'libre') {
+      campos.push({
+        id: 'p-' + prod + '-unidad',
+        prod,
+        key: 'unidad'
+      });
+    } else {
+      (p.variantes || []).forEach(v => campos.push({
+        id: 'p-' + prod + '-' + v.key,
+        prod,
+        key: v.key
+      }));
+    }
+  });
+  campos.push({
+    id: 'p-envio-cerca',
+    prod: 'envio',
+    key: 'cerca'
+  });
+  campos.push({
+    id: 'p-envio-lejos',
+    prod: 'envio',
+    key: 'lejos'
+  });
 
-  // Validar que TODOS los campos tengan un valor mayor a 0 antes de guardar nada
-  const faltantes = campos.filter(c => parseMiles(document.getElementById(c.id).value) <= 0);
-  if (faltantes.length > 0) {
-    showToast('Faltan ' + faltantes.length + ' precio' + (faltantes.length === 1 ? '' : 's') + '. Completá los campos marcados en rojo.');
-    // Resaltar en rojo los campos vacíos para que se vean de un vistazo
-    campos.forEach(c => {
-      const el = document.getElementById(c.id);
-      const vacio = parseMiles(el.value) <= 0;
-      el.style.borderColor = vacio ? 'var(--red)' : 'var(--border)';
-    });
-    return;
-  }
+  let faltantes = 0;
+  campos.forEach(c => {
+    const el = document.getElementById(c.id);
+    if (!el) return;
+    const val = parseMiles(el.value);
+    if (!STATE.precios[c.prod]) STATE.precios[c.prod] = {};
+    STATE.precios[c.prod][c.key] = val;
+    if (val <= 0) {
+      faltantes++;
+      el.style.borderColor = 'var(--red)';
+    } else {
+      el.style.borderColor = 'var(--border)';
+    }
+  });
 
-  STATE.precios.chipa.media = parseMiles(document.getElementById('p-chipa-media').value);
-  STATE.precios.chipa.docena = parseMiles(document.getElementById('p-chipa-docena').value);
-  STATE.precios.chipa.docenaymedia = parseMiles(document.getElementById('p-chipa-docenaymedia').value);
-  STATE.precios.factura.media = parseMiles(document.getElementById('p-factura-media').value);
-  STATE.precios.factura.docena = parseMiles(document.getElementById('p-factura-docena').value);
-  STATE.precios.factura.docenaymedia = parseMiles(document.getElementById('p-factura-docenaymedia').value);
-  STATE.precios.sandwich.unidad = parseMiles(document.getElementById('p-sandwich-unidad').value);
-  STATE.precios.envio.cerca = parseMiles(document.getElementById('p-envio-cerca').value);
-  STATE.precios.envio.lejos = parseMiles(document.getElementById('p-envio-lejos').value);
   const ok = await savePrecios();
-  if (ok) showToast('Precios guardados ✓');
+  if (ok) {
+    showToast(faltantes > 0 ?
+      ('Precios guardados ✓ (quedaron ' + faltantes + ' en $0)') :
+      'Precios guardados ✓');
+  }
   renderVender();
   renderStock();
 }
@@ -676,13 +951,13 @@ function renderVentas() {
   // Resumen agregado por producto (suma de docenas/unidades, sin separar por media/docena/docena y media)
   const resumen = document.getElementById('ventas-resumen');
   let resumenHtml = '<h2>Total vendido por producto</h2>';
-  Object.keys(PRODUCTS).forEach(prod => {
-    const p = PRODUCTS[prod];
+  productosOrdenados().forEach(prod => {
+    const p = STATE.productos[prod];
     const sumQty = list.filter(v => v.prod === prod).reduce((s, v) => s + (v.qty || 0), 0);
     const sumMonto = list.filter(v => v.prod === prod).reduce((s, v) => s + v.monto, 0);
-    const qtyTexto = p.unit === 'docenas' ? fmtDocenasLargo(sumQty) : (sumQty + ' unidad' + (sumQty === 1 ? '' : 'es'));
+    const qtyTexto = fmtCantidad(prod, sumQty);
     resumenHtml += `<div class="prod-row">
-      <div class="prod-icon">${icon(prod)}</div>
+      <div class="prod-icon">${prodIconHtml(prod)}</div>
       <div style="flex:1;">
         <div class="prod-name">${p.label}</div>
         ${sumQty>0 ? `<span class="qty-pill">${qtyTexto}</span>` : ''}
@@ -710,7 +985,7 @@ function renderVentas() {
       });
       const envioTxt = v.envio === 'cerca' ? 'envío cerca' : v.envio === 'lejos' ? 'envío lejos' : '';
       const texto = [
-        PRODUCTS[v.prod].label,
+        STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod,
         v.qtyLabel || '',
         envioTxt,
         fecha1, fecha2,
@@ -734,9 +1009,10 @@ function renderVentas() {
       minute: '2-digit'
     });
     const envioTxt = v.envio === 'cerca' ? ' + envío cerca' : v.envio === 'lejos' ? ' + envío lejos' : '';
+    const nombreProd = STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod;
     return `<div class="venta-item">
-      <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${icon(v.prod,15)}</div>
-      <div style="flex:1;"><div class="p">${PRODUCTS[v.prod].label}${envioTxt}</div><div class="t">${hora}</div></div>
+      <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
+      <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${hora}</div></div>
       <div class="m">${fmtMoney(v.monto)}</div>
     </div>`;
   }).join('');
@@ -876,7 +1152,7 @@ function detallePremio(p) {
   if (p.tipo === 'envio_gratis') return 'El pedido no paga envío';
   if (p.tipo === 'descuento_pct') return p.valor + '% de descuento en el pedido';
   if (p.tipo === 'descuento_monto') return fmtMoney(p.valor) + ' de descuento en el pedido';
-  if (p.tipo === 'producto_gratis') return 'Si el pedido tiene ' + p.cantidadLabel + ' o más de ' + (PRODUCTS[p.prod] ? PRODUCTS[p.prod].label : p.prod) + ', esa parte sale gratis';
+  if (p.tipo === 'producto_gratis') return 'Si el pedido tiene ' + p.cantidadLabel + ' o más de ' + (STATE.productos[p.prod] ? STATE.productos[p.prod].label : p.prod) + ', esa parte sale gratis';
   return '';
 }
 
@@ -916,35 +1192,40 @@ function seleccionarTipoPremio(tipo) {
   });
   const extra = document.getElementById('premio-campos-extra');
   if (tipo === 'producto_gratis') {
+    const ids = productosOrdenados();
+    if (ids.length === 0) {
+      extra.innerHTML = '<p class="muted" style="margin:8px 0;">Todavía no cargaste productos.</p>';
+      return;
+    }
     extra.innerHTML = `
       <p class="muted" style="font-weight:700; margin:8px 0; font-size:12px; text-transform:uppercase;">Producto a regalar</p>
       <div class="grid3" style="margin-bottom:10px;">
-        <div class="qty-btn" id="premio-prod-chipa" onclick="seleccionarProdPremio('chipa')">Chipá</div>
-        <div class="qty-btn" id="premio-prod-factura" onclick="seleccionarProdPremio('factura')">Factura</div>
-        <div class="qty-btn" id="premio-prod-sandwich" onclick="seleccionarProdPremio('sandwich')">Sándwich</div>
+        ${ids.map(id => `<div class="qty-btn" id="premio-prod-${id}" onclick="seleccionarProdPremio('${id}')">${STATE.productos[id].label}</div>`).join('')}
       </div>
       <div id="premio-cantidad-opts"></div>
     `;
-    seleccionarProdPremio('chipa');
+    seleccionarProdPremio(ids[0]);
   } else {
     extra.innerHTML = '';
   }
 }
 
-let premioProdActual = 'chipa';
+let premioProdActual = null;
 let premioCantidadActual = null;
 
 function seleccionarProdPremio(prod) {
   premioProdActual = prod;
-  ['chipa', 'factura', 'sandwich'].forEach(p => {
-    document.getElementById('premio-prod-' + p).style.background = (p === prod) ? 'var(--orange-soft)' : '';
+  productosOrdenados().forEach(p => {
+    const el = document.getElementById('premio-prod-' + p);
+    if (el) el.style.background = (p === prod) ? 'var(--orange-soft)' : '';
   });
   const wrap = document.getElementById('premio-cantidad-opts');
-  const opts = prod === 'sandwich' ? [{
+  const producto = STATE.productos[prod];
+  const opts = producto.pricingMode === 'libre' ? [{
     key: 'unidad',
-    label: '1 unidad',
+    label: '1 ' + producto.unit,
     qty: 1
-  }] : PRODUCTS[prod].opts.filter(o => o.key !== 'docenaymedia');
+  }] : (producto.variantes || []).filter((o, i, arr) => i < arr.length - 1 || arr.length === 1);
   premioCantidadActual = opts[0];
   wrap.innerHTML = '<div class="grid3">' + opts.map((o, i) => `<div class="qty-btn premio-cant-opt" data-idx="${i}" style="${i===0?'background:var(--orange-soft);':''}" onclick="seleccionarCantidadPremio(${i})">${o.label}</div>`).join('') + '</div>';
   wrap._opts = opts;
@@ -1139,7 +1420,7 @@ function renderClienteVenta() {
       }).join('');
     }
     if (sinCoincidir.length > 0) {
-      html += sinCoincidir.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">No hay ${PRODUCTS[p.prod]?PRODUCTS[p.prod].label:''} suficiente en este pedido</span></div>`).join('');
+      html += sinCoincidir.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">No hay ${STATE.productos[p.prod]?STATE.productos[p.prod].label:''} suficiente en este pedido</span></div>`).join('');
     }
     if (sinPuntos.length > 0) {
       html += sinPuntos.map(p => `<div class="qty-btn" style="text-align:left; opacity:0.45;">${p.nombre}<span class="p">Faltan ${p.costoPuntos - c.puntos} pts</span></div>`).join('');
@@ -1167,16 +1448,24 @@ function stockDisponiblePedido(prod) {
 }
 
 function iniciarVenta(prod, optKey, customOpt) {
-  const opt = customOpt || PRODUCTS[prod].opts.find(o => o.key === optKey);
+  const producto = STATE.productos[prod];
+  if (!producto) {
+    showToast('Ese producto ya no existe');
+    return;
+  }
+  const opt = customOpt || (producto.variantes || []).find(o => o.key === optKey);
+  if (!opt) {
+    showToast('No se encontró esa opción de venta');
+    return;
+  }
   const disponible = stockDisponiblePedido(prod);
   if (disponible < opt.qty) {
-    const dispTexto = PRODUCTS[prod].unit === 'docenas' ? fmtDocenasLargo(disponible) : disponible + ' unidades';
-    showToast('No hay suficiente stock de ' + PRODUCTS[prod].label + ' (' + dispTexto + ' disponibles)');
+    showToast('No hay suficiente stock de ' + producto.label + ' (' + fmtCantidad(prod, disponible) + ' disponibles)');
     return;
   }
   const precio = customOpt ? customOpt.monto : precioFor(prod, optKey);
   if (!precio || precio <= 0) {
-    showToast('Falta cargar el precio de ' + PRODUCTS[prod].label + ' en Precios');
+    showToast('Falta cargar el precio de ' + producto.label + ' en Precios');
     return;
   }
   carrito.push({
@@ -1187,7 +1476,7 @@ function iniciarVenta(prod, optKey, customOpt) {
     monto: precio
   });
   renderCarrito();
-  showToast('Agregado al pedido: ' + PRODUCTS[prod].label + ' - ' + opt.label);
+  showToast('Agregado al pedido: ' + producto.label + ' - ' + opt.label);
 }
 
 function renderCarrito() {
@@ -1200,8 +1489,8 @@ function renderCarrito() {
   card.style.display = 'block';
   lista.innerHTML = carrito.map((item, idx) => `
     <div class="prod-row">
-      <div class="prod-icon">${icon(item.prod)}</div>
-      <div style="flex:1;"><div class="prod-name">${PRODUCTS[item.prod].label}</div><div class="unit-tag">${item.label}</div></div>
+      <div class="prod-icon">${prodIconHtml(item.prod)}</div>
+      <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
       <div class="stock-num">${fmtMoney(item.monto)}</div>
       <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="quitarDelCarrito(${idx})">✕</button>
     </div>
@@ -1227,8 +1516,8 @@ function abrirFinalizarPedido() {
   const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
   body.innerHTML = carrito.map(item => `
     <div class="prod-row">
-      <div class="prod-icon">${icon(item.prod)}</div>
-      <div style="flex:1;"><div class="prod-name">${PRODUCTS[item.prod].label}</div><div class="unit-tag">${item.label}</div></div>
+      <div class="prod-icon">${prodIconHtml(item.prod)}</div>
+      <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
       <div class="stock-num">${fmtMoney(item.monto)}</div>
     </div>
   `).join('') + `
@@ -1395,12 +1684,14 @@ let editarStockProd = null;
 
 function abrirEditarStock(prod) {
   editarStockProd = prod;
-  const p = PRODUCTS[prod];
+  const p = STATE.productos[prod];
+  if (!p) return;
   document.getElementById('editar-stock-title').textContent = p.label + ' — Stock';
 
   // Sección "Agregar stock"
-  const esBolsas = p.unit === 'docenas';
-  document.getElementById('agregar-stock-label').textContent = esBolsas ? 'Cantidad de bolsas (18 docenas c/u)' : 'Cantidad de unidades hechas';
+  document.getElementById('agregar-stock-label').textContent = p.packSize ?
+    ('Cantidad de ' + (p.packLabel || 'paquetes') + ' (' + p.packSize + ' ' + p.unit + ' c/u)') :
+    ('Cantidad de ' + p.unit + ' a agregar');
   const agregarInput = document.getElementById('agregar-stock-input');
   agregarInput.value = '';
   agregarInput.style.borderColor = 'var(--border)';
@@ -1410,7 +1701,7 @@ function abrirEditarStock(prod) {
 
   // Sección "Corregir cantidad exacta"
   const editarInput = document.getElementById('editar-stock-input');
-  editarInput.step = esBolsas ? '0.5' : '1';
+  editarInput.step = '0.5';
   editarInput.value = STATE.stock[prod] || 0;
   editarInput.style.borderColor = 'var(--border)';
   document.getElementById('editar-stock-label').textContent = 'Cantidad (' + p.unit + ')';
@@ -1420,10 +1711,10 @@ function abrirEditarStock(prod) {
 
 function actualizarPreviewAgregarStock() {
   if (!editarStockProd) return;
-  const p = PRODUCTS[editarStockProd];
+  const p = STATE.productos[editarStockProd];
   const val = Number(document.getElementById('agregar-stock-input').value) || 0;
-  if (p.unit === 'docenas') {
-    document.getElementById('agregar-stock-preview').textContent = val > 0 ? '= ' + (val * 18) + ' docenas' : '';
+  if (p.packSize) {
+    document.getElementById('agregar-stock-preview').textContent = val > 0 ? '= ' + (val * p.packSize) + ' ' + p.unit : '';
   } else {
     document.getElementById('agregar-stock-preview').textContent = '';
   }
@@ -1438,8 +1729,8 @@ async function confirmarAgregarStock() {
     return;
   }
   input.style.borderColor = 'var(--border)';
-  const p = PRODUCTS[editarStockProd];
-  const aAgregar = p.unit === 'docenas' ? val * 18 : val;
+  const p = STATE.productos[editarStockProd];
+  const aAgregar = p.packSize ? val * p.packSize : val;
   STATE.stock[editarStockProd] = (STATE.stock[editarStockProd] || 0) + aAgregar;
   const ok = await saveStock();
   if (ok) {
@@ -1466,7 +1757,7 @@ async function confirmarEditarStock() {
   const ok = await saveStock();
   if (ok) {
     cerrarModal('overlay-editar-stock');
-    showToast('Stock de ' + PRODUCTS[editarStockProd].label + ' actualizado ✓');
+    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' actualizado ✓');
   }
   renderStock();
   renderVender();
@@ -1476,7 +1767,7 @@ async function vaciarStock() {
   const ok = await saveStock();
   if (ok) {
     cerrarModal('overlay-editar-stock');
-    showToast('Stock de ' + PRODUCTS[editarStockProd].label + ' vaciado ✓');
+    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' vaciado ✓');
   }
   renderStock();
   renderVender();
@@ -1503,9 +1794,7 @@ async function confirmarReinicio() {
     return;
   }
   try {
-    await db.collection('doldichipa').doc('stock').set({
-      ...DEFAULT_STOCK
-    });
+    await db.collection('doldichipa').doc('stock').set({});
     await borrarColeccion('doldichipa_ventas');
     await borrarColeccion('doldichipa_remis');
     cerrarModal('overlay-reset');
@@ -1663,14 +1952,9 @@ function handleScanResult(text) {
       return;
     }
     const tipo = parts[1]; // VENTA | CARGA
-    const prodRaw = (parts[2] || '').toLowerCase();
-    const prodMap = {
-      chipa: 'chipa',
-      factura: 'factura',
-      sandwich: 'sandwich'
-    };
-    const prod = prodMap[prodRaw];
-    if (!prod) {
+    const prod = (parts[2] || '').toLowerCase();
+    const p = STATE.productos[prod];
+    if (!p) {
       document.getElementById('scan-status').textContent = 'Código no reconocido.';
       scannerLoopId = requestAnimationFrame(scanLoop);
       return;
@@ -1680,10 +1964,10 @@ function handleScanResult(text) {
     if (tipo === 'VENTA') {
       abrirSelectorCantidad(prod);
     } else if (tipo === 'CARGA') {
-      const cant = Number(parts[3]) || 18;
+      const cant = Number(parts[3]) || p.packSize || 1;
       STATE.stock[prod] = (STATE.stock[prod] || 0) + cant;
       saveStock();
-      showToast('+ ' + cant + ' docenas de ' + PRODUCTS[prod].label + ' cargadas ✓');
+      showToast('+ ' + cant + ' ' + p.unit + ' de ' + p.label + ' cargadas ✓');
       renderStock();
       renderVender();
     }
@@ -1692,31 +1976,54 @@ function handleScanResult(text) {
   }
 }
 
-let sandwichQtyActual = 1;
+function abrirElegirProducto() {
+  const wrap = document.getElementById('elegir-producto-lista');
+  const ids = productosOrdenados();
+  if (ids.length === 0) {
+    wrap.innerHTML = '<div class="empty">Todavía no cargaste productos. Andá a Productos → + Nuevo producto.</div>';
+  } else {
+    wrap.innerHTML = ids.map(id => {
+      const p = STATE.productos[id];
+      return `<div class="prod-row" style="cursor:pointer;" onclick="cerrarModal('overlay-elegir-producto'); abrirSelectorCantidad('${id}')">
+        <div class="prod-icon">${prodIconHtml(id)}</div>
+        <div style="flex:1;" class="prod-name">${p.label}</div>
+        <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('overlay-elegir-producto').classList.add('show');
+}
+
+let libreQtyProd = null;
+let libreQtyActual = 1;
 
 function abrirSelectorCantidad(prod) {
-  const p = PRODUCTS[prod];
-  document.getElementById('qty-title').innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; vertical-align:middle;">${icon(prod,20)} ${p.label} — elegí la cantidad</span>`;
-  const dispTexto = p.unit === 'docenas' ? fmtDocenasLargo(stockDisponiblePedido(prod)) : stockDisponiblePedido(prod) + ' unidades';
-  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + dispTexto;
+  const p = STATE.productos[prod];
+  if (!p) {
+    showToast('Ese producto ya no existe');
+    return;
+  }
+  document.getElementById('qty-title').innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; vertical-align:middle;">${prodIconHtml(prod,20)} ${p.label} — elegí la cantidad</span>`;
+  document.getElementById('qty-stock').textContent = 'Stock disponible: ' + fmtCantidad(prod, stockDisponiblePedido(prod));
   const wrap = document.getElementById('qty-options');
   wrap.innerHTML = '';
 
-  if (prod === 'sandwich') {
-    // El sándwich no viene en bolsas de tamaño fijo: cantidad libre con +/-
-    sandwichQtyActual = 1;
+  if (p.pricingMode === 'libre') {
+    // Cantidad libre con +/-
+    libreQtyProd = prod;
+    libreQtyActual = 1;
     wrap.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:center; gap:24px; padding:14px 0 6px;">
-        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadSandwich(-1)">−</button>
-        <div style="font-size:34px; font-weight:800; min-width:56px; text-align:center;" id="sandwich-qty-display">1</div>
-        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadSandwich(1)">+</button>
+        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(-1)">−</button>
+        <div style="font-size:34px; font-weight:800; min-width:56px; text-align:center;" id="libre-qty-display">1</div>
+        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(1)">+</button>
       </div>
-      <p class="muted" style="text-align:center; margin:4px 0 14px;" id="sandwich-qty-precio">$0</p>
-      <button class="btn btn-green btn-block" onclick="confirmarCantidadSandwich()">Continuar</button>
+      <p class="muted" style="text-align:center; margin:4px 0 14px;" id="libre-qty-precio">$0</p>
+      <button class="btn btn-green btn-block" onclick="confirmarCantidadLibre()">Continuar</button>
     `;
-    actualizarDisplaySandwich();
+    actualizarDisplayLibre();
   } else {
-    p.opts.forEach(o => {
+    (p.variantes || []).forEach(o => {
       const btn = document.createElement('div');
       btn.className = 'qty-btn';
       btn.style.textAlign = 'left';
@@ -1731,31 +2038,32 @@ function abrirSelectorCantidad(prod) {
   document.getElementById('overlay-qty').classList.add('show');
 }
 
-function cambiarCantidadSandwich(delta) {
-  const nueva = sandwichQtyActual + delta;
+function cambiarCantidadLibre(delta) {
+  const nueva = libreQtyActual + delta;
   if (nueva < 1) return;
-  const stockVal = stockDisponiblePedido('sandwich');
+  const stockVal = stockDisponiblePedido(libreQtyProd);
   if (nueva > stockVal) {
-    showToast('No hay suficiente stock de Sándwich de chipá (' + stockVal + ' disponibles)');
+    showToast('No hay suficiente stock de ' + STATE.productos[libreQtyProd].label + ' (' + fmtCantidad(libreQtyProd, stockVal) + ' disponibles)');
     return;
   }
-  sandwichQtyActual = nueva;
-  actualizarDisplaySandwich();
+  libreQtyActual = nueva;
+  actualizarDisplayLibre();
 }
 
-function actualizarDisplaySandwich() {
-  document.getElementById('sandwich-qty-display').textContent = sandwichQtyActual;
-  const precioUnidad = STATE.precios.sandwich.unidad || 0;
-  document.getElementById('sandwich-qty-precio').textContent = fmtMoney(precioUnidad * sandwichQtyActual);
+function actualizarDisplayLibre() {
+  document.getElementById('libre-qty-display').textContent = libreQtyActual;
+  const precioUnidad = (STATE.precios[libreQtyProd] && STATE.precios[libreQtyProd].unidad) || 0;
+  document.getElementById('libre-qty-precio').textContent = fmtMoney(precioUnidad * libreQtyActual);
 }
 
-function confirmarCantidadSandwich() {
-  const precioUnidad = STATE.precios.sandwich.unidad || 0;
+function confirmarCantidadLibre() {
+  const p = STATE.productos[libreQtyProd];
+  const precioUnidad = (STATE.precios[libreQtyProd] && STATE.precios[libreQtyProd].unidad) || 0;
   cerrarModal('overlay-qty');
-  iniciarVenta('sandwich', 'custom', {
-    qty: sandwichQtyActual,
-    label: sandwichQtyActual + ' unidad' + (sandwichQtyActual === 1 ? '' : 'es'),
-    monto: precioUnidad * sandwichQtyActual
+  iniciarVenta(libreQtyProd, 'custom', {
+    qty: libreQtyActual,
+    label: libreQtyActual + ' ' + p.unit,
+    monto: precioUnidad * libreQtyActual
   });
 }
 

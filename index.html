@@ -17,6 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.16.0/firebase-app-compat.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.16.0/firebase-firestore-compat.min.js"></script>
   <link rel="stylesheet" href="styles.css">
@@ -62,6 +63,7 @@
         <h2 style="justify-content:center; margin-bottom:4px;">Escaneá el QR de la bolsita</h2>
         <p class="muted" style="margin-bottom:18px;">Escaneá cada bolsita del pedido (podés escanear varias seguidas). Cuando termines, tocá "Finalizar pedido" para elegir el envío y confirmar todo junto.</p>
         <button class="btn btn-gold btn-block" onclick="abrirScanner('venta')">Escanear código</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="abrirElegirProducto()">Elegir producto sin escanear</button>
       </div>
       <div class="card" id="carrito-card" style="display:none;">
         <h2>Pedido actual</h2>
@@ -104,6 +106,16 @@
       <div class="card">
         <h2>Movimientos</h2>
         <div id="remis-list"></div>
+      </div>
+    </section>
+
+    <!-- PRODUCTOS -->
+    <section class="tab-panel" id="tab-productos">
+      <div class="section-title">Productos</div>
+      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Creá, editá o borrá los productos que vendés. Después cargá el stock y el precio en sus pestañas.</p>
+      <button class="btn btn-gold btn-block" onclick="abrirProductoForm()">+ Nuevo producto</button>
+      <div class="card" style="margin-top:14px;">
+        <div id="productos-lista"></div>
       </div>
     </section>
 
@@ -151,76 +163,8 @@
     <!-- PRECIOS -->
     <section class="tab-panel" id="tab-precios">
       <div class="section-title">Precios</div>
+      <div class="acc-group" id="precios-productos"></div>
       <div class="acc-group">
-        <div class="acc-item">
-          <button class="acc-header" data-target="acc-precio-chipa" data-group="precios" onclick="toggleAccordion('acc-precio-chipa','precios')">
-            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-                <circle cx="12" cy="13" r="7.2" />
-                <circle cx="9" cy="11" r="0.5" fill="currentColor" stroke="none" />
-                <circle cx="14.5" cy="10.5" r="0.5" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="15.5" r="0.5" fill="currentColor" stroke="none" />
-                <circle cx="15.5" cy="14" r="0.5" fill="currentColor" stroke="none" />
-                <circle cx="8.5" cy="15" r="0.5" fill="currentColor" stroke="none" />
-              </svg></span>
-            <span style="flex:1; text-align:left;">Chipá (por bolsita)</span>
-            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          <div class="acc-body" id="acc-precio-chipa" data-group="precios">
-            <div class="row-input"><label>Media docena</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-chipa-media" oninput="formatMiles(this)"></div>
-            </div>
-            <div class="row-input"><label>Una docena</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-chipa-docena" oninput="formatMiles(this)"></div>
-            </div>
-            <div class="row-input"><label>Docena y media</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-chipa-docenaymedia" oninput="formatMiles(this)"></div>
-            </div>
-          </div>
-        </div>
-        <div class="acc-item">
-          <button class="acc-header" data-target="acc-precio-factura" data-group="precios" onclick="toggleAccordion('acc-precio-factura','precios')">
-            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3.5 15.5c1-6.5 5.5-10.5 10-10.5 4 0 6.5 2 6.5 4.7 0 2-1.8 3.3-4 3.3-1 3-4 5-7.5 5-2.3 0-5-.8-5-2.5z" />
-                <path d="M9 8.5l1 3.2M13 7l1.2 3.3M16.5 8.5l1 2.6" />
-              </svg></span>
-            <span style="flex:1; text-align:left;">Factura (por bolsita)</span>
-            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          <div class="acc-body" id="acc-precio-factura" data-group="precios">
-            <div class="row-input"><label>Media docena</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-factura-media" oninput="formatMiles(this)"></div>
-            </div>
-            <div class="row-input"><label>Una docena</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-factura-docena" oninput="formatMiles(this)"></div>
-            </div>
-            <div class="row-input"><label>Docena y media</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-factura-docenaymedia" oninput="formatMiles(this)"></div>
-            </div>
-          </div>
-        </div>
-        <div class="acc-item">
-          <button class="acc-header" data-target="acc-precio-sandwich" data-group="precios" onclick="toggleAccordion('acc-precio-sandwich','precios')">
-            <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3.5 11.5L12 4.5l8.5 7" />
-                <path d="M4 11.5v3.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.2" />
-                <path d="M3.5 11.5h17" />
-                <path d="M7 16.7l1-2M12 16.7v-2M17 16.7l-1-2" />
-              </svg></span>
-            <span style="flex:1; text-align:left;">Sándwich de chipá</span>
-            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          <div class="acc-body" id="acc-precio-sandwich" data-group="precios">
-            <div class="row-input"><label>Precio unidad</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-sandwich-unidad" oninput="formatMiles(this)"></div>
-            </div>
-          </div>
-        </div>
         <div class="acc-item">
           <button class="acc-header" data-target="acc-precio-envio" data-group="precios" onclick="toggleAccordion('acc-precio-envio','precios')">
             <span class="h2-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -427,6 +371,13 @@
       </svg>
       Stock
     </button>
+    <button class="drawer-item" data-tab="productos" onclick="irATab('productos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2l9 5v10l-9 5-9-5V7z" />
+        <path d="M3 7l9 5 9-5M12 12v10" />
+      </svg>
+      Productos
+    </button>
     <button class="drawer-item" data-tab="precios" onclick="irATab('precios')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M20.59 13.41L11 3.83 3.83 11l9.58 9.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83z" />
@@ -611,6 +562,88 @@
       <p class="muted" style="margin-top:8px; font-weight:700; color:var(--red);">Esta acción no se puede deshacer.</p>
       <button class="btn btn-rust btn-block" style="margin-top:16px;" id="confirm-eliminar-cliente-btn">Sí, eliminar</button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="cerrarModal('overlay-confirm-eliminar-cliente')">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- ELEGIR PRODUCTO SIN ESCANEAR -->
+  <div class="overlay" id="overlay-elegir-producto">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-elegir-producto')">✕</button>
+      <h3>Elegir producto</h3>
+      <div id="elegir-producto-lista" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- PRODUCTO FORM (crear/editar) -->
+  <div class="overlay" id="overlay-producto-form">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-producto-form')">✕</button>
+      <h3 id="producto-form-title">Nuevo producto</h3>
+
+      <div class="form-field">
+        <label>Nombre</label>
+        <input type="text" id="pf-nombre" placeholder="Ej: Hamburguesa">
+      </div>
+
+      <div class="form-field">
+        <label>Ícono</label>
+        <div class="emoji-grid" id="pf-emoji-grid"></div>
+      </div>
+
+      <div class="form-field">
+        <label>Unidad de medida (cómo contás el stock)</label>
+        <input type="text" id="pf-unidad" placeholder="Ej: unidades, docenas, kg">
+      </div>
+
+      <div class="form-field">
+        <label>¿Cómo se vende?</label>
+        <div class="mode-toggle">
+          <div class="mode-opt" id="pf-modo-libre" onclick="seleccionarModoPrecio('libre')">Cantidad libre<br><span style="font-weight:500;">(precio por unidad)</span></div>
+          <div class="mode-opt" id="pf-modo-variantes" onclick="seleccionarModoPrecio('variantes')">Paquetes fijos<br><span style="font-weight:500;">(ej: docena)</span></div>
+        </div>
+      </div>
+
+      <div id="pf-precio-libre-wrap" class="form-field">
+        <label>Precio por unidad</label>
+        <input type="text" inputmode="numeric" id="pf-precio-unidad" oninput="formatMiles(this)">
+      </div>
+
+      <div id="pf-variantes-wrap" style="display:none;">
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.3px; margin-bottom:8px;">Opciones de venta</label>
+        <div id="pf-variantes-list"></div>
+        <button class="btn btn-sm btn-ghost" onclick="agregarVarianteForm()">+ Agregar opción</button>
+      </div>
+
+      <div class="form-check" style="margin-top:16px;">
+        <input type="checkbox" id="pf-usa-paquete" onchange="togglePaqueteForm()">
+        <label for="pf-usa-paquete" style="margin:0;">Cargo el stock en paquetes (ej: bolsas)</label>
+      </div>
+      <div id="pf-paquete-wrap" style="display:none;">
+        <div class="form-field">
+          <label>Nombre del paquete</label>
+          <input type="text" id="pf-paquete-nombre" placeholder="Ej: bolsa">
+        </div>
+        <div class="form-field">
+          <label id="pf-paquete-cantidad-label">Cantidad por paquete (en la unidad de medida)</label>
+          <input type="number" id="pf-paquete-cantidad" min="1" step="1">
+        </div>
+      </div>
+
+      <button class="btn btn-green btn-block" style="margin-top:8px;" onclick="guardarProductoForm()">Guardar producto</button>
+      <button class="btn btn-rust btn-block" id="pf-eliminar-btn" style="margin-top:10px; display:none;" onclick="confirmarEliminarProducto()">Eliminar producto</button>
+    </div>
+  </div>
+
+  <!-- PRODUCTO QR -->
+  <div class="overlay" id="overlay-producto-qr">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-producto-qr')">✕</button>
+      <h3 id="producto-qr-title">Códigos QR</h3>
+      <p class="muted" style="margin-top:0;">Imprimí y pegá cada código en las bolsitas correspondientes.</p>
+      <p class="muted" style="font-weight:700; margin:14px 0 4px;">Código de venta (1 bolsita)</p>
+      <div class="qr-box"><canvas id="producto-qr-venta"></canvas></div>
+      <p class="muted" style="font-weight:700; margin:14px 0 4px;" id="producto-qr-carga-label">Código de carga</p>
+      <div class="qr-box"><canvas id="producto-qr-carga"></canvas></div>
     </div>
   </div>
 
