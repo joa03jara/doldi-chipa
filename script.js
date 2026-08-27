@@ -502,6 +502,20 @@ function cerrarModal(id) {
   document.getElementById(id).classList.remove('show');
 }
 
+// Todas las ventanas emergentes (.overlay) comparten el mismo z-index en el CSS,
+// así que si una se abre desde adentro de otra (ej: "Elegir producto" desde
+// "Nuevo pedido"), sin esto quedaría tapada por la que ya estaba abierta según
+// el orden en el HTML. Con este contador, la que se abrió última siempre queda
+// arriba de todas.
+let overlayZTop = 50;
+
+function mostrarOverlay(id) {
+  const el = document.getElementById(id);
+  overlayZTop++;
+  el.style.zIndex = overlayZTop;
+  el.classList.add('show');
+}
+
 function toggleAccordion(bodyId, group) {
   const body = document.getElementById(bodyId);
   const header = document.querySelector('.acc-header[data-target="' + bodyId + '"][data-group="' + group + '"]');
@@ -644,7 +658,7 @@ function abrirProductoForm(editId) {
   seleccionarModoPrecio(pfModoActual);
   renderVariantesForm();
   togglePaqueteForm();
-  document.getElementById('overlay-producto-form').classList.add('show');
+  mostrarOverlay('overlay-producto-form');
 }
 
 function seleccionarEmojiForm(e) {
@@ -809,7 +823,7 @@ function abrirProductoQR(id) {
   } catch (e) {
     showToast('No se pudo generar el QR');
   }
-  document.getElementById('overlay-producto-qr').classList.add('show');
+  mostrarOverlay('overlay-producto-qr');
 }
 
 function renderVender() {
@@ -1125,7 +1139,7 @@ function abrirRemisMov(tipo) {
   document.getElementById('remis-mov-concepto').style.borderColor = 'var(--border)';
   medioPagoRemis = 'efectivo';
   renderMedioPagoOpts('remis-mov-medio-opts', medioPagoRemis, 'seleccionarMedioRemis');
-  document.getElementById('overlay-remis-mov').classList.add('show');
+  mostrarOverlay('overlay-remis-mov');
 }
 async function confirmarRemisMov() {
   const montoInput = document.getElementById('remis-mov-monto');
@@ -1210,7 +1224,7 @@ function abrirAjustarCaja(medio) {
   const val = STATE.caja[medio] || 0;
   document.getElementById('ajustar-caja-input').value = val ? val.toLocaleString('es-AR') : '';
   document.getElementById('ajustar-caja-input').style.borderColor = 'var(--border)';
-  document.getElementById('overlay-ajustar-caja').classList.add('show');
+  mostrarOverlay('overlay-ajustar-caja');
 }
 
 async function confirmarAjustarCaja() {
@@ -1297,7 +1311,7 @@ function abrirPremioForm() {
   document.getElementById('premio-costo-puntos').value = '';
   tipoPremioActual = 'envio_gratis';
   seleccionarTipoPremio('envio_gratis');
-  document.getElementById('overlay-premio-form').classList.add('show');
+  mostrarOverlay('overlay-premio-form');
 }
 
 function seleccionarTipoPremio(tipo) {
@@ -1419,7 +1433,7 @@ async function eliminarClienteUI(dni, nombre) {
     const eliminado = await eliminarCliente(dni);
     if (eliminado) showToast('Cliente eliminado');
   };
-  document.getElementById('overlay-confirm-eliminar-cliente').classList.add('show');
+  mostrarOverlay('overlay-confirm-eliminar-cliente');
 }
 
 function buscarClienteEnMemoria(dni) {
@@ -1654,7 +1668,7 @@ function abrirPedidoForm() {
   renderPedidoItems();
   renderPedidoEnvioOpts();
   renderMedioPagoOpts('ped-medio-opts', medioPagoPedido, 'seleccionarMedioPedido');
-  document.getElementById('overlay-pedido-form').classList.add('show');
+  mostrarOverlay('overlay-pedido-form');
 }
 
 function renderPedidoItems() {
@@ -1893,7 +1907,7 @@ function abrirFinalizarPedido() {
   medioPagoVenta = 'efectivo';
   renderMedioPagoOpts('confirm-medio-opts', medioPagoVenta, 'seleccionarMedioVenta');
   renderEnvioOpts();
-  document.getElementById('overlay-confirm').classList.add('show');
+  mostrarOverlay('overlay-confirm');
 }
 
 function renderEnvioOpts() {
@@ -2079,7 +2093,7 @@ function abrirEditarStock(prod) {
   editarInput.style.borderColor = 'var(--border)';
   document.getElementById('editar-stock-label').textContent = 'Cantidad (' + p.unit + ')';
 
-  document.getElementById('overlay-editar-stock').classList.add('show');
+  mostrarOverlay('overlay-editar-stock');
 }
 
 function actualizarPreviewAgregarStock() {
@@ -2149,7 +2163,7 @@ async function vaciarStock() {
 /* ================= REINICIAR SISTEMA ================= */
 function abrirReiniciarSistema() {
   closeDrawer();
-  document.getElementById('overlay-reset').classList.add('show');
+  mostrarOverlay('overlay-reset');
 }
 async function borrarColeccion(nombre) {
   let snap = await db.collection(nombre).get();
@@ -2185,7 +2199,7 @@ function abrirScanner(modeArg) {
   scannerMode = modeArg || 'venta';
   document.getElementById('scanner-title').textContent = 'Escanear bolsita de venta';
   document.getElementById('scan-status').textContent = 'Buscando código...';
-  document.getElementById('overlay-scanner').classList.add('show');
+  mostrarOverlay('overlay-scanner');
 
   // El sonido de "bip" solo se puede desbloquear durante un toque real del
   // usuario (esto, que es un onclick de botón, cuenta). Si lo creamos recién
@@ -2366,7 +2380,7 @@ function abrirElegirProducto(destino) {
       </div>`;
     }).join('');
   }
-  document.getElementById('overlay-elegir-producto').classList.add('show');
+  mostrarOverlay('overlay-elegir-producto');
 }
 
 let libreQtyProd = null;
@@ -2410,7 +2424,7 @@ function abrirSelectorCantidad(prod) {
       wrap.appendChild(btn);
     });
   }
-  document.getElementById('overlay-qty').classList.add('show');
+  mostrarOverlay('overlay-qty');
 }
 
 function cambiarCantidadLibre(delta) {
