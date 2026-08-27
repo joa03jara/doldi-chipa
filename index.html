@@ -134,23 +134,12 @@
     <!-- CAJA -->
     <section class="tab-panel" id="tab-caja">
       <div class="section-title">Caja</div>
-      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Cuánto tenés en mano ahora mismo. Se suma solo con cada venta y con los ingresos/gastos que cargues en Remis (según el medio de pago que elijas).</p>
+      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Cuánta plata tenés en mano ahora mismo, en total. Se suma sola con cada venta y con los ingresos/gastos que cargues en Remis.</p>
       <div class="total-banner">
         <div class="big" id="caja-total">$0</div>
-        <div class="lbl">Total (efectivo + transferencia)</div>
+        <div class="lbl">Total en caja</div>
       </div>
-      <div class="card">
-        <div class="prod-row">
-          <div class="prod-name">💵 Efectivo</div>
-          <div class="stock-num" id="caja-efectivo">$0</div>
-          <button class="btn btn-sm btn-ghost" onclick="abrirAjustarCaja('efectivo')">Ajustar</button>
-        </div>
-        <div class="prod-row">
-          <div class="prod-name">🏦 Transferencia</div>
-          <div class="stock-num" id="caja-transferencia">$0</div>
-          <button class="btn btn-sm btn-ghost" onclick="abrirAjustarCaja('transferencia')">Ajustar</button>
-        </div>
-      </div>
+      <button class="btn btn-ghost btn-block" onclick="abrirAjustarCaja()">Ajustar saldo</button>
     </section>
 
     <!-- PRODUCTOS -->
@@ -525,9 +514,6 @@
       <p class="muted" style="margin:14px 0 6px; font-weight:600;">Envío</p>
       <div class="grid3" id="confirm-envio-opts" style="margin-bottom:14px;"></div>
 
-      <p class="muted" style="margin:14px 0 6px; font-weight:600;">Medio de pago</p>
-      <div class="grid2" id="confirm-medio-opts" style="margin-bottom:14px;"></div>
-
       <p class="muted" style="margin:14px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Fecha y hora de la venta</p>
       <div class="form-field" style="margin-bottom:14px;">
         <input type="datetime-local" id="venta-fecha-hora" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
@@ -600,8 +586,6 @@
         <label>Concepto</label>
         <input type="text" id="remis-mov-concepto" placeholder="Ej: Nafta, viaje centro, pan..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
       </div>
-      <p class="muted" style="margin:14px 0 6px; font-weight:600;">Medio de pago</p>
-      <div class="grid2" id="remis-mov-medio-opts" style="margin-bottom:4px;"></div>
       <button class="btn btn-gold btn-block" id="remis-mov-btn" style="margin-top:14px;" onclick="confirmarRemisMov()">Guardar</button>
     </div>
   </div>
@@ -610,7 +594,7 @@
   <div class="overlay" id="overlay-ajustar-caja">
     <div class="sheet sheet-wrap">
       <button class="close" onclick="cerrarModal('overlay-ajustar-caja')">✕</button>
-      <h3 id="ajustar-caja-title">Ajustar saldo</h3>
+      <h3 id="ajustar-caja-title">Ajustar saldo de caja</h3>
       <p class="muted" style="margin-top:4px;">Poné el monto real que tenés ahora. Esto reemplaza el saldo actual (no lo suma).</p>
       <div class="row-input">
         <label>Monto</label>
@@ -676,8 +660,6 @@
       </div>
       <p class="muted" style="margin:14px 0 6px; font-weight:600;">Envío</p>
       <div class="grid3" id="ped-envio-opts" style="margin-bottom:14px;"></div>
-      <p class="muted" style="margin:14px 0 6px; font-weight:600;">Medio de pago</p>
-      <div class="grid2" id="ped-medio-opts" style="margin-bottom:14px;"></div>
       <button class="btn btn-green btn-block" onclick="guardarPedido()">Guardar pedido</button>
     </div>
   </div>

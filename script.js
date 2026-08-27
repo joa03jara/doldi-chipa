@@ -86,8 +86,7 @@ let STATE = {
   clientes: [],
   pedidos: [],
   caja: {
-    efectivo: 0,
-    transferencia: 0
+    total: 0
   },
   puntosPorMil: 1
 };
@@ -183,9 +182,12 @@ function attachListeners() {
     showToast('No se pudieron leer los pedidos de la nube');
   });
   db.collection('doldichipa').doc('caja').onSnapshot(doc => {
-    STATE.caja = doc.exists ? doc.data() : {
-      efectivo: 0,
-      transferencia: 0
+    // Compatible con la versión anterior (que guardaba efectivo/transferencia
+    // por separado): si existe ese formato viejo, se suma para armar el total.
+    const d = doc.exists ? doc.data() : {};
+    const total = (typeof d.total === 'number') ? d.total : ((d.efectivo || 0) + (d.transferencia || 0));
+    STATE.caja = {
+      total
     };
     renderCaja();
   }, () => {
@@ -1119,9 +1121,8 @@ function renderRemis() {
     const signo = esIngreso ? '+' : '−';
     const color = esIngreso ? 'var(--green)' : 'var(--red)';
     const label = m.concepto ? m.concepto : (esIngreso ? 'Ingreso' : 'Gasto');
-    const medioTxt = m.medio ? (' · ' + (m.medio === 'efectivo' ? 'Efectivo' : 'Transferencia')) : '';
     return `<div class="venta-item">
-      <div><div class="p">${esIngreso?'🟢':'🔴'} ${label}</div><div class="t">${hora}${medioTxt}</div></div>
+      <div><div class="p">${esIngreso?'🟢':'🔴'} ${label}</div><div class="t">${hora}</div></div>
       <div class="m" style="color:${color};">${signo} ${fmtMoney(m.monto)}</div>
     </div>`;
   }).join('');
@@ -1137,8 +1138,6 @@ function abrirRemisMov(tipo) {
   document.getElementById('remis-mov-monto').style.borderColor = 'var(--border)';
   document.getElementById('remis-mov-concepto').value = '';
   document.getElementById('remis-mov-concepto').style.borderColor = 'var(--border)';
-  medioPagoRemis = 'efectivo';
-  renderMedioPagoOpts('remis-mov-medio-opts', medioPagoRemis, 'seleccionarMedioRemis');
   mostrarOverlay('overlay-remis-mov');
 }
 async function confirmarRemisMov() {
@@ -1163,11 +1162,10 @@ async function confirmarRemisMov() {
     ts: Date.now(),
     tipo: remisMovTipo,
     monto,
-    concepto,
-    medio: medioPagoRemis
+    concepto
   });
   if (ok) {
-    STATE.caja[medioPagoRemis] = (STATE.caja[medioPagoRemis] || 0) + (remisMovTipo === 'ingreso' ? monto : -monto);
+    STATE.caja.total = (STATE.caja.total || 0) + (remisMovTipo === 'ingreso' ? monto : -monto);
     await saveCaja();
     cerrarModal('overlay-remis-mov');
     showToast((remisMovTipo === 'ingreso' ? 'Ingreso' : 'Gasto') + ' registrado ✓');
@@ -1175,53 +1173,13 @@ async function confirmarRemisMov() {
   }
 }
 
-/* ================= CAJA (efectivo / transferencia) ================= */
-function renderMedioPagoOpts(containerId, actual, onClickFnName) {
-  const wrap = document.getElementById(containerId);
-  if (!wrap) return;
-  const opts = [{
-    key: 'efectivo',
-    label: '💵 Efectivo'
-  }, {
-    key: 'transferencia',
-    label: '🏦 Transferencia'
-  }];
-  wrap.innerHTML = opts.map(o => `<div class="qty-btn" style="${actual===o.key?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="${onClickFnName}('${o.key}')">${o.label}</div>`).join('');
-}
-
-let medioPagoVenta = 'efectivo';
-let medioPagoRemis = 'efectivo';
-let medioPagoPedido = 'efectivo';
-
-function seleccionarMedioVenta(key) {
-  medioPagoVenta = key;
-  renderMedioPagoOpts('confirm-medio-opts', medioPagoVenta, 'seleccionarMedioVenta');
-}
-
-function seleccionarMedioRemis(key) {
-  medioPagoRemis = key;
-  renderMedioPagoOpts('remis-mov-medio-opts', medioPagoRemis, 'seleccionarMedioRemis');
-}
-
-function seleccionarMedioPedido(key) {
-  medioPagoPedido = key;
-  renderMedioPagoOpts('ped-medio-opts', medioPagoPedido, 'seleccionarMedioPedido');
-}
-
+/* ================= CAJA (total en mano) ================= */
 function renderCaja() {
-  const efectivo = STATE.caja.efectivo || 0;
-  const transferencia = STATE.caja.transferencia || 0;
-  document.getElementById('caja-efectivo').textContent = fmtMoney(efectivo);
-  document.getElementById('caja-transferencia').textContent = fmtMoney(transferencia);
-  document.getElementById('caja-total').textContent = fmtMoney(efectivo + transferencia);
+  document.getElementById('caja-total').textContent = fmtMoney(STATE.caja.total || 0);
 }
 
-let ajustarCajaMedio = 'efectivo';
-
-function abrirAjustarCaja(medio) {
-  ajustarCajaMedio = medio;
-  document.getElementById('ajustar-caja-title').textContent = 'Ajustar ' + (medio === 'efectivo' ? 'efectivo' : 'transferencia');
-  const val = STATE.caja[medio] || 0;
+function abrirAjustarCaja() {
+  const val = STATE.caja.total || 0;
   document.getElementById('ajustar-caja-input').value = val ? val.toLocaleString('es-AR') : '';
   document.getElementById('ajustar-caja-input').style.borderColor = 'var(--border)';
   mostrarOverlay('overlay-ajustar-caja');
@@ -1236,7 +1194,7 @@ async function confirmarAjustarCaja() {
     return;
   }
   input.style.borderColor = 'var(--border)';
-  STATE.caja[ajustarCajaMedio] = val;
+  STATE.caja.total = val;
   const ok = await saveCaja();
   if (ok) {
     cerrarModal('overlay-ajustar-caja');
@@ -1663,11 +1621,9 @@ function abrirPedidoForm() {
   destinoAgregar = 'pedido';
   pedidoItemsActual = [];
   pedidoEnvioActual = null;
-  medioPagoPedido = 'efectivo';
   document.getElementById('ped-cliente').value = '';
   renderPedidoItems();
   renderPedidoEnvioOpts();
-  renderMedioPagoOpts('ped-medio-opts', medioPagoPedido, 'seleccionarMedioPedido');
   mostrarOverlay('overlay-pedido-form');
 }
 
@@ -1742,7 +1698,6 @@ async function guardarPedido() {
       cliente,
       items: pedidoItemsActual,
       envio: pedidoEnvioActual,
-      medioPago: medioPagoPedido,
       estado: 'pendiente',
       creadoTs: Date.now()
     });
@@ -1829,9 +1784,8 @@ async function confirmarPedidoListo(id) {
     });
   });
 
-  const medioPago = pedido.medioPago || 'efectivo';
   const totalPedido = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
-  STATE.caja[medioPago] = (STATE.caja[medioPago] || 0) + totalPedido;
+  STATE.caja.total = (STATE.caja.total || 0) + totalPedido;
 
   const resultados = await Promise.all([
     saveStock(),
@@ -1904,8 +1858,6 @@ function abrirFinalizarPedido() {
   document.getElementById('venta-cliente-dni').value = '';
   document.getElementById('venta-cliente-resultado').innerHTML = '';
   document.getElementById('venta-fecha-hora').value = toDatetimeLocalValue(new Date());
-  medioPagoVenta = 'efectivo';
-  renderMedioPagoOpts('confirm-medio-opts', medioPagoVenta, 'seleccionarMedioVenta');
   renderEnvioOpts();
   mostrarOverlay('overlay-confirm');
 }
@@ -2021,9 +1973,9 @@ async function confirmarVenta() {
 
   const promesas = [saveStock(), ...ventaPromises];
 
-  // Sumar el total de esta venta a la caja (efectivo o transferencia)
+  // Sumar el total de esta venta a la caja
   const totalVenta = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
-  STATE.caja[medioPagoVenta] = (STATE.caja[medioPagoVenta] || 0) + totalVenta;
+  STATE.caja.total = (STATE.caja.total || 0) + totalVenta;
   promesas.push(saveCaja());
 
   // Si hay un cliente cargado, sumar/descontar sus puntos también en paralelo
