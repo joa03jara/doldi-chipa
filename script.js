@@ -85,6 +85,10 @@ let STATE = {
   premios: [],
   clientes: [],
   pedidos: [],
+  caja: {
+    efectivo: 0,
+    transferencia: 0
+  },
   puntosPorMil: 1
 };
 let scannerStream = null;
@@ -177,6 +181,15 @@ function attachListeners() {
     if (document.getElementById('tab-pedidos').classList.contains('active')) renderPedidos();
   }, () => {
     showToast('No se pudieron leer los pedidos de la nube');
+  });
+  db.collection('doldichipa').doc('caja').onSnapshot(doc => {
+    STATE.caja = doc.exists ? doc.data() : {
+      efectivo: 0,
+      transferencia: 0
+    };
+    renderCaja();
+  }, () => {
+    showToast('No se pudo leer la caja de la nube');
   });
   db.collection('doldichipa_ventas').orderBy('ts', 'desc').limit(1000).onSnapshot(snap => {
     STATE.ventas = snap.docs.map(d => ({
@@ -290,6 +303,19 @@ async function savePrecios() {
     return true;
   } catch (e) {
     showToast('No se pudieron guardar los precios');
+    return false;
+  }
+}
+async function saveCaja() {
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return false;
+  }
+  try {
+    await db.collection('doldichipa').doc('caja').set(STATE.caja);
+    return true;
+  } catch (e) {
+    showToast('No se pudo guardar la caja');
     return false;
   }
 }
@@ -513,6 +539,7 @@ function irATab(name) {
   else if (name === 'stock') renderStock();
   else if (name === 'productos') renderProductosLista();
   else if (name === 'pedidos') renderPedidos();
+  else if (name === 'caja') renderCaja();
   else if (name === 'ventas') renderVentas();
   else if (name === 'remis') renderRemis();
   else if (name === 'resumen') renderResumen();
@@ -1078,8 +1105,9 @@ function renderRemis() {
     const signo = esIngreso ? '+' : '−';
     const color = esIngreso ? 'var(--green)' : 'var(--red)';
     const label = m.concepto ? m.concepto : (esIngreso ? 'Ingreso' : 'Gasto');
+    const medioTxt = m.medio ? (' · ' + (m.medio === 'efectivo' ? 'Efectivo' : 'Transferencia')) : '';
     return `<div class="venta-item">
-      <div><div class="p">${esIngreso?'🟢':'🔴'} ${label}</div><div class="t">${hora}</div></div>
+      <div><div class="p">${esIngreso?'🟢':'🔴'} ${label}</div><div class="t">${hora}${medioTxt}</div></div>
       <div class="m" style="color:${color};">${signo} ${fmtMoney(m.monto)}</div>
     </div>`;
   }).join('');
@@ -1095,6 +1123,8 @@ function abrirRemisMov(tipo) {
   document.getElementById('remis-mov-monto').style.borderColor = 'var(--border)';
   document.getElementById('remis-mov-concepto').value = '';
   document.getElementById('remis-mov-concepto').style.borderColor = 'var(--border)';
+  medioPagoRemis = 'efectivo';
+  renderMedioPagoOpts('remis-mov-medio-opts', medioPagoRemis, 'seleccionarMedioRemis');
   document.getElementById('overlay-remis-mov').classList.add('show');
 }
 async function confirmarRemisMov() {
@@ -1119,12 +1149,86 @@ async function confirmarRemisMov() {
     ts: Date.now(),
     tipo: remisMovTipo,
     monto,
-    concepto
+    concepto,
+    medio: medioPagoRemis
   });
   if (ok) {
+    STATE.caja[medioPagoRemis] = (STATE.caja[medioPagoRemis] || 0) + (remisMovTipo === 'ingreso' ? monto : -monto);
+    await saveCaja();
     cerrarModal('overlay-remis-mov');
     showToast((remisMovTipo === 'ingreso' ? 'Ingreso' : 'Gasto') + ' registrado ✓');
+    renderCaja();
   }
+}
+
+/* ================= CAJA (efectivo / transferencia) ================= */
+function renderMedioPagoOpts(containerId, actual, onClickFnName) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const opts = [{
+    key: 'efectivo',
+    label: '💵 Efectivo'
+  }, {
+    key: 'transferencia',
+    label: '🏦 Transferencia'
+  }];
+  wrap.innerHTML = opts.map(o => `<div class="qty-btn" style="${actual===o.key?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="${onClickFnName}('${o.key}')">${o.label}</div>`).join('');
+}
+
+let medioPagoVenta = 'efectivo';
+let medioPagoRemis = 'efectivo';
+let medioPagoPedido = 'efectivo';
+
+function seleccionarMedioVenta(key) {
+  medioPagoVenta = key;
+  renderMedioPagoOpts('confirm-medio-opts', medioPagoVenta, 'seleccionarMedioVenta');
+}
+
+function seleccionarMedioRemis(key) {
+  medioPagoRemis = key;
+  renderMedioPagoOpts('remis-mov-medio-opts', medioPagoRemis, 'seleccionarMedioRemis');
+}
+
+function seleccionarMedioPedido(key) {
+  medioPagoPedido = key;
+  renderMedioPagoOpts('ped-medio-opts', medioPagoPedido, 'seleccionarMedioPedido');
+}
+
+function renderCaja() {
+  const efectivo = STATE.caja.efectivo || 0;
+  const transferencia = STATE.caja.transferencia || 0;
+  document.getElementById('caja-efectivo').textContent = fmtMoney(efectivo);
+  document.getElementById('caja-transferencia').textContent = fmtMoney(transferencia);
+  document.getElementById('caja-total').textContent = fmtMoney(efectivo + transferencia);
+}
+
+let ajustarCajaMedio = 'efectivo';
+
+function abrirAjustarCaja(medio) {
+  ajustarCajaMedio = medio;
+  document.getElementById('ajustar-caja-title').textContent = 'Ajustar ' + (medio === 'efectivo' ? 'efectivo' : 'transferencia');
+  const val = STATE.caja[medio] || 0;
+  document.getElementById('ajustar-caja-input').value = val ? val.toLocaleString('es-AR') : '';
+  document.getElementById('ajustar-caja-input').style.borderColor = 'var(--border)';
+  document.getElementById('overlay-ajustar-caja').classList.add('show');
+}
+
+async function confirmarAjustarCaja() {
+  const input = document.getElementById('ajustar-caja-input');
+  const val = parseMiles(input.value);
+  if (val < 0 || input.value.trim() === '') {
+    input.style.borderColor = 'var(--red)';
+    showToast('Ingresá un monto válido');
+    return;
+  }
+  input.style.borderColor = 'var(--border)';
+  STATE.caja[ajustarCajaMedio] = val;
+  const ok = await saveCaja();
+  if (ok) {
+    cerrarModal('overlay-ajustar-caja');
+    showToast('Saldo actualizado ✓');
+  }
+  renderCaja();
 }
 
 /* ================= RESUMEN GENERAL ================= */
@@ -1545,9 +1649,11 @@ function abrirPedidoForm() {
   destinoAgregar = 'pedido';
   pedidoItemsActual = [];
   pedidoEnvioActual = null;
+  medioPagoPedido = 'efectivo';
   document.getElementById('ped-cliente').value = '';
   renderPedidoItems();
   renderPedidoEnvioOpts();
+  renderMedioPagoOpts('ped-medio-opts', medioPagoPedido, 'seleccionarMedioPedido');
   document.getElementById('overlay-pedido-form').classList.add('show');
 }
 
@@ -1622,6 +1728,7 @@ async function guardarPedido() {
       cliente,
       items: pedidoItemsActual,
       envio: pedidoEnvioActual,
+      medioPago: medioPagoPedido,
       estado: 'pendiente',
       creadoTs: Date.now()
     });
@@ -1708,8 +1815,13 @@ async function confirmarPedidoListo(id) {
     });
   });
 
+  const medioPago = pedido.medioPago || 'efectivo';
+  const totalPedido = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
+  STATE.caja[medioPago] = (STATE.caja[medioPago] || 0) + totalPedido;
+
   const resultados = await Promise.all([
     saveStock(),
+    saveCaja(),
     ...ventaPromises,
     db.collection('doldichipa_pedidos').doc(id).update({
       estado: 'listo',
@@ -1733,6 +1845,7 @@ async function confirmarPedidoListo(id) {
   renderStock();
   renderVender();
   renderVentas();
+  renderCaja();
 }
 
 async function eliminarPedidoUI(id) {
@@ -1777,6 +1890,8 @@ function abrirFinalizarPedido() {
   document.getElementById('venta-cliente-dni').value = '';
   document.getElementById('venta-cliente-resultado').innerHTML = '';
   document.getElementById('venta-fecha-hora').value = toDatetimeLocalValue(new Date());
+  medioPagoVenta = 'efectivo';
+  renderMedioPagoOpts('confirm-medio-opts', medioPagoVenta, 'seleccionarMedioVenta');
   renderEnvioOpts();
   document.getElementById('overlay-confirm').classList.add('show');
 }
@@ -1892,6 +2007,11 @@ async function confirmarVenta() {
 
   const promesas = [saveStock(), ...ventaPromises];
 
+  // Sumar el total de esta venta a la caja (efectivo o transferencia)
+  const totalVenta = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
+  STATE.caja[medioPagoVenta] = (STATE.caja[medioPagoVenta] || 0) + totalVenta;
+  promesas.push(saveCaja());
+
   // Si hay un cliente cargado, sumar/descontar sus puntos también en paralelo
   if (clienteVentaActual) {
     const puntosGanados = Math.floor(subtotalOriginal / 1000) * (STATE.puntosPorMil || 1);
@@ -1928,6 +2048,7 @@ async function confirmarVenta() {
   renderVender();
   renderStock();
   renderVentas();
+  renderCaja();
 }
 
 /* ================= CARGA FLOW ================= */
