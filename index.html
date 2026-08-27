@@ -77,6 +77,28 @@
       </div>
     </section>
 
+    <!-- PEDIDOS (libreta de pedidos) -->
+    <section class="tab-panel" id="tab-pedidos">
+      <div class="section-title">Pedidos</div>
+      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Anotá los pedidos en el orden que te los van pidiendo. Cuando termines de armar uno, tocá "Marcar listo" y se descuenta el stock solo.</p>
+      <button class="btn btn-gold btn-block" onclick="abrirPedidoForm()">+ Nuevo pedido</button>
+      <div class="card" style="margin-top:14px;">
+        <h2>En espera</h2>
+        <div id="pedidos-lista"></div>
+      </div>
+      <div class="acc-group">
+        <div class="acc-item">
+          <button class="acc-header" data-target="acc-pedidos-listos" data-group="pedidos" onclick="toggleAccordion('acc-pedidos-listos','pedidos')">
+            <span style="flex:1; text-align:left;">Completados hoy</span>
+            <svg class="acc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc-body" id="acc-pedidos-listos" data-group="pedidos">
+            <div id="pedidos-listos-lista"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- REMIS -->
     <section class="tab-panel" id="tab-remis">
       <div class="section-title">Remis</div>
@@ -355,6 +377,13 @@
       </svg>
       Vender
     </button>
+    <button class="drawer-item" data-tab="pedidos" onclick="irATab('pedidos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1z" />
+        <path d="M9 11h6M9 15h6M9 7h2" />
+      </svg>
+      Pedidos
+    </button>
     <button class="drawer-item" data-tab="remis" onclick="irATab('remis')">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 11.5l1.3-4A2 2 0 0 1 8.2 6.2h7.6a2 2 0 0 1 1.9 1.3l1.3 4" />
@@ -465,6 +494,13 @@
 
       <p class="muted" style="margin:14px 0 6px; font-weight:600;">Envío</p>
       <div class="grid3" id="confirm-envio-opts" style="margin-bottom:14px;"></div>
+
+      <p class="muted" style="margin:14px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Fecha y hora de la venta</p>
+      <div class="form-field" style="margin-bottom:14px;">
+        <input type="datetime-local" id="venta-fecha-hora" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+        <p class="muted" style="margin:6px 0 0; font-size:12px;">Por defecto es ahora. Cambiala si estás cargando una venta de otro momento (ej: de ayer).</p>
+      </div>
+
       <button class="btn btn-green btn-block" onclick="confirmarVenta()">Confirmar pedido</button>
     </div>
   </div>
@@ -571,6 +607,27 @@
       <button class="close" onclick="cerrarModal('overlay-elegir-producto')">✕</button>
       <h3>Elegir producto</h3>
       <div id="elegir-producto-lista" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- NUEVO PEDIDO (libreta) -->
+  <div class="overlay" id="overlay-pedido-form">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-pedido-form')">✕</button>
+      <h3>Nuevo pedido</h3>
+      <div class="form-field">
+        <label>Cliente (nombre o teléfono)</label>
+        <input type="text" id="ped-cliente" placeholder="Ej: María / 11-2345-6789">
+      </div>
+      <button class="btn btn-ghost btn-block" onclick="abrirElegirProducto('pedido')">+ Agregar producto</button>
+      <div id="ped-items-lista" style="margin-top:10px;"></div>
+      <div class="prod-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;">
+        <div class="prod-name" style="flex:1;">Subtotal</div>
+        <div class="stock-num" id="ped-subtotal">$0</div>
+      </div>
+      <p class="muted" style="margin:14px 0 6px; font-weight:600;">Envío</p>
+      <div class="grid3" id="ped-envio-opts" style="margin-bottom:14px;"></div>
+      <button class="btn btn-green btn-block" onclick="guardarPedido()">Guardar pedido</button>
     </div>
   </div>
 

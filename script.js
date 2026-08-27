@@ -84,6 +84,7 @@ let STATE = {
   remis: [],
   premios: [],
   clientes: [],
+  pedidos: [],
   puntosPorMil: 1
 };
 let scannerStream = null;
@@ -167,6 +168,15 @@ function attachListeners() {
     renderStock();
   }, () => {
     showToast('No se pudieron leer los precios de la nube');
+  });
+  db.collection('doldichipa_pedidos').onSnapshot(snap => {
+    STATE.pedidos = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+    if (document.getElementById('tab-pedidos').classList.contains('active')) renderPedidos();
+  }, () => {
+    showToast('No se pudieron leer los pedidos de la nube');
   });
   db.collection('doldichipa_ventas').orderBy('ts', 'desc').limit(1000).onSnapshot(snap => {
     STATE.ventas = snap.docs.map(d => ({
@@ -502,6 +512,7 @@ function irATab(name) {
   if (name === 'precios') renderPrecios();
   else if (name === 'stock') renderStock();
   else if (name === 'productos') renderProductosLista();
+  else if (name === 'pedidos') renderPedidos();
   else if (name === 'ventas') renderVentas();
   else if (name === 'remis') renderRemis();
   else if (name === 'resumen') renderResumen();
@@ -1441,10 +1452,17 @@ function seleccionarPremioVenta(id) {
 /* ================= VENTA FLOW ================= */
 let envioSeleccionado = null; // null | 'cerca' | 'lejos'
 let carrito = []; // items del pedido actual: {prod, optKey, qty, label, monto}
+let destinoAgregar = 'venta'; // 'venta' | 'pedido' — a dónde van los productos que se eligen
+let pedidoItemsActual = []; // items del pedido de la libreta que se está armando
+let pedidoEnvioActual = null;
 
 function stockDisponiblePedido(prod) {
   const enCarrito = carrito.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
-  return (STATE.stock[prod] || 0) - enCarrito;
+  const enPedidoActual = pedidoItemsActual.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
+  const enPedidosPendientes = STATE.pedidos
+    .filter(p => p.estado === 'pendiente')
+    .reduce((s, p) => s + (p.items || []).filter(i => i.prod === prod).reduce((s2, i) => s2 + i.qty, 0), 0);
+  return (STATE.stock[prod] || 0) - enCarrito - enPedidoActual - enPedidosPendientes;
 }
 
 function iniciarVenta(prod, optKey, customOpt) {
@@ -1468,15 +1486,27 @@ function iniciarVenta(prod, optKey, customOpt) {
     showToast('Falta cargar el precio de ' + producto.label + ' en Precios');
     return;
   }
-  carrito.push({
-    prod,
-    optKey,
-    qty: opt.qty,
-    label: opt.label,
-    monto: precio
-  });
-  renderCarrito();
-  showToast('Agregado al pedido: ' + producto.label + ' - ' + opt.label);
+  if (destinoAgregar === 'pedido') {
+    pedidoItemsActual.push({
+      prod,
+      optKey,
+      qty: opt.qty,
+      label: opt.label,
+      monto: precio
+    });
+    renderPedidoItems();
+    showToast('Agregado: ' + producto.label + ' - ' + opt.label);
+  } else {
+    carrito.push({
+      prod,
+      optKey,
+      qty: opt.qty,
+      label: opt.label,
+      monto: precio
+    });
+    renderCarrito();
+    showToast('Agregado al pedido: ' + producto.label + ' - ' + opt.label);
+  }
 }
 
 function renderCarrito() {
@@ -1510,6 +1540,221 @@ function vaciarCarrito() {
   showToast('Pedido vaciado');
 }
 
+/* ================= LIBRETA DE PEDIDOS ================= */
+function abrirPedidoForm() {
+  destinoAgregar = 'pedido';
+  pedidoItemsActual = [];
+  pedidoEnvioActual = null;
+  document.getElementById('ped-cliente').value = '';
+  renderPedidoItems();
+  renderPedidoEnvioOpts();
+  document.getElementById('overlay-pedido-form').classList.add('show');
+}
+
+function renderPedidoItems() {
+  const wrap = document.getElementById('ped-items-lista');
+  if (pedidoItemsActual.length === 0) {
+    wrap.innerHTML = '<div class="empty">Todavía no agregaste productos.</div>';
+  } else {
+    wrap.innerHTML = pedidoItemsActual.map((item, idx) => `
+      <div class="prod-row">
+        <div class="prod-icon">${prodIconHtml(item.prod)}</div>
+        <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
+        <div class="stock-num">${fmtMoney(item.monto)}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="quitarDePedidoActual(${idx})">✕</button>
+      </div>
+    `).join('');
+  }
+  const subtotal = pedidoItemsActual.reduce((s, i) => s + i.monto, 0);
+  document.getElementById('ped-subtotal').textContent = fmtMoney(subtotal);
+}
+
+function quitarDePedidoActual(idx) {
+  pedidoItemsActual.splice(idx, 1);
+  renderPedidoItems();
+}
+
+function renderPedidoEnvioOpts() {
+  const wrap = document.getElementById('ped-envio-opts');
+  const opts = [{
+      key: null,
+      label: 'Sin envío',
+      precio: 0
+    },
+    {
+      key: 'cerca',
+      label: 'Envío cerca',
+      precio: (STATE.precios.envio && STATE.precios.envio.cerca) || 0
+    },
+    {
+      key: 'lejos',
+      label: 'Envío lejos',
+      precio: (STATE.precios.envio && STATE.precios.envio.lejos) || 0
+    },
+  ];
+  wrap.innerHTML = opts.map(o => {
+    const active = pedidoEnvioActual === o.key;
+    return `<div class="qty-btn" style="${active?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="seleccionarEnvioPedido(${o.key?`'${o.key}'`:'null'})">${o.label}${o.precio? `<span class="p">${fmtMoney(o.precio)}</span>`:''}</div>`;
+  }).join('');
+}
+
+function seleccionarEnvioPedido(key) {
+  pedidoEnvioActual = key;
+  renderPedidoEnvioOpts();
+}
+
+async function guardarPedido() {
+  const cliente = document.getElementById('ped-cliente').value.trim();
+  if (!cliente) {
+    showToast('Poné el nombre o el teléfono de quién pidió');
+    return;
+  }
+  if (pedidoItemsActual.length === 0) {
+    showToast('Agregá al menos un producto al pedido');
+    return;
+  }
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    await db.collection('doldichipa_pedidos').add({
+      cliente,
+      items: pedidoItemsActual,
+      envio: pedidoEnvioActual,
+      estado: 'pendiente',
+      creadoTs: Date.now()
+    });
+    cerrarModal('overlay-pedido-form');
+    showToast('Pedido de ' + cliente + ' anotado ✓');
+    pedidoItemsActual = [];
+    pedidoEnvioActual = null;
+  } catch (e) {
+    showToast('No se pudo guardar el pedido');
+  }
+}
+
+function resumenItemsPedido(items) {
+  return (items || []).map(i => i.label + ' de ' + (STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod)).join(', ');
+}
+
+function renderPedidos() {
+  const pendientes = STATE.pedidos.filter(p => p.estado === 'pendiente').sort((a, b) => a.creadoTs - b.creadoTs);
+  const wrap = document.getElementById('pedidos-lista');
+  if (pendientes.length === 0) {
+    wrap.innerHTML = '<div class="empty">No hay pedidos en espera.</div>';
+  } else {
+    wrap.innerHTML = pendientes.map((p, idx) => {
+      const subtotal = (p.items || []).reduce((s, i) => s + i.monto, 0) + (p.envio ? ((STATE.precios.envio && STATE.precios.envio[p.envio]) || 0) : 0);
+      const esPrimero = idx === 0;
+      return `<div class="product-item" style="align-items:flex-start; ${esPrimero?'background:var(--orange-soft); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; border-bottom:none;':'padding-bottom:14px;'}">
+        <div style="flex:1;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            ${esPrimero ? '<span style="background:var(--orange); color:#2a1a08; font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px;">SIGUE ESTE</span>' : `<span class="muted" style="font-size:12px; font-weight:700;">#${idx+1}</span>`}
+            <div class="prod-name">${p.cliente}</div>
+          </div>
+          <div class="unit-tag" style="white-space:normal;">${resumenItemsPedido(p.items)}${p.envio ? ' + envío ' + p.envio : ''}</div>
+          <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
+        </div>
+        <div class="pi-actions" style="flex-direction:column; align-items:stretch;">
+          <button class="btn btn-sm btn-green" onclick="confirmarPedidoListo('${p.id}')">Marcar listo</button>
+          <button class="btn btn-sm btn-ghost" onclick="eliminarPedidoUI('${p.id}')">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const hoyInicio = new Date();
+  hoyInicio.setHours(0, 0, 0, 0);
+  const listosHoy = STATE.pedidos
+    .filter(p => p.estado === 'listo' && p.listoTs >= hoyInicio.getTime())
+    .sort((a, b) => b.listoTs - a.listoTs);
+  const wrapListos = document.getElementById('pedidos-listos-lista');
+  if (listosHoy.length === 0) {
+    wrapListos.innerHTML = '<div class="empty">Todavía no marcaste ningún pedido como listo hoy.</div>';
+  } else {
+    wrapListos.innerHTML = listosHoy.map(p => `
+      <div class="venta-item">
+        <div style="flex:1;"><div class="p">${p.cliente}</div><div class="t">${resumenItemsPedido(p.items)}</div></div>
+      </div>
+    `).join('');
+  }
+}
+
+async function confirmarPedidoListo(id) {
+  const pedido = STATE.pedidos.find(p => p.id === id);
+  if (!pedido) return;
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+
+  const items = pedido.items || [];
+  items.forEach(item => {
+    STATE.stock[item.prod] = Math.max(0, (STATE.stock[item.prod] || 0) - item.qty);
+  });
+
+  const envioMonto = pedido.envio ? ((STATE.precios.envio && STATE.precios.envio[pedido.envio]) || 0) : 0;
+  const ventaPromises = items.map((item, i) => {
+    const esUltimo = i === items.length - 1;
+    return addVenta({
+      ts: Date.now(),
+      prod: item.prod,
+      optKey: item.optKey,
+      qty: item.qty,
+      qtyLabel: item.label,
+      monto: item.monto + (esUltimo ? envioMonto : 0),
+      envio: esUltimo ? pedido.envio : null
+    });
+  });
+
+  const resultados = await Promise.all([
+    saveStock(),
+    ...ventaPromises,
+    db.collection('doldichipa_pedidos').doc(id).update({
+      estado: 'listo',
+      listoTs: Date.now()
+    }).then(() => true).catch(() => false)
+  ]);
+
+  if (resultados.every(Boolean)) {
+    const siguiente = STATE.pedidos
+      .filter(p => p.estado === 'pendiente' && p.id !== id)
+      .sort((a, b) => a.creadoTs - b.creadoTs)[0];
+    let msg = 'Pedido de ' + pedido.cliente + ' listo ✓';
+    msg += siguiente ?
+      (' — Sigue: ' + siguiente.cliente + ' (' + resumenItemsPedido(siguiente.items) + ')') :
+      ' — No quedan más pedidos en espera';
+    showToast(msg);
+  } else {
+    showToast('Hubo un problema al marcar el pedido como listo. Probá de nuevo.');
+  }
+  renderPedidos();
+  renderStock();
+  renderVender();
+  renderVentas();
+}
+
+async function eliminarPedidoUI(id) {
+  const pedido = STATE.pedidos.find(p => p.id === id);
+  if (!confirm('¿Eliminar el pedido de "' + (pedido ? pedido.cliente : '') + '"? No se puede deshacer.')) return;
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    await db.collection('doldichipa_pedidos').doc(id).delete();
+    showToast('Pedido eliminado');
+  } catch (e) {
+    showToast('No se pudo eliminar el pedido');
+  }
+}
+
+function toDatetimeLocalValue(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
 function abrirFinalizarPedido() {
   if (carrito.length === 0) return;
   const body = document.getElementById('confirm-body');
@@ -1531,6 +1776,7 @@ function abrirFinalizarPedido() {
   premioSeleccionadoVenta = null;
   document.getElementById('venta-cliente-dni').value = '';
   document.getElementById('venta-cliente-resultado').innerHTML = '';
+  document.getElementById('venta-fecha-hora').value = toDatetimeLocalValue(new Date());
   renderEnvioOpts();
   document.getElementById('overlay-confirm').classList.add('show');
 }
@@ -1625,10 +1871,16 @@ async function confirmarVenta() {
   });
 
   // El envío se suma una sola vez, en el último ítem, para no cobrarlo varias veces.
+  let tsElegido = Date.now();
+  const fechaInput = document.getElementById('venta-fecha-hora');
+  if (fechaInput && fechaInput.value) {
+    const parsed = new Date(fechaInput.value);
+    if (!isNaN(parsed.getTime())) tsElegido = parsed.getTime();
+  }
   const ventaPromises = items.map((item, i) => {
     const esUltimo = i === items.length - 1;
     return addVenta({
-      ts: Date.now(),
+      ts: tsElegido,
       prod: item.prod,
       optKey: item.optKey,
       qty: item.qty,
@@ -1962,6 +2214,7 @@ function handleScanResult(text) {
     reproducirBip();
     cerrarScanner();
     if (tipo === 'VENTA') {
+      destinoAgregar = 'venta';
       abrirSelectorCantidad(prod);
     } else if (tipo === 'CARGA') {
       const cant = Number(parts[3]) || p.packSize || 1;
@@ -1976,7 +2229,8 @@ function handleScanResult(text) {
   }
 }
 
-function abrirElegirProducto() {
+function abrirElegirProducto(destino) {
+  destinoAgregar = destino || 'venta';
   const wrap = document.getElementById('elegir-producto-lista');
   const ids = productosOrdenados();
   if (ids.length === 0) {

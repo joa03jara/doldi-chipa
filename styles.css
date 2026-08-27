@@ -933,60 +933,116 @@ main {
 
 /* ================= DESKTOP / PC LAYOUT ================= */
 @media (min-width: 900px) {
+  html, body { height: 100%; }
+
   body {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr);
-    grid-template-areas: "drawer header" "drawer main";
-    align-items: start;
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "header header" "drawer main";
+    min-height: 100vh;
   }
 
   .menu-btn { display: none; }
   .drawer-overlay { display: none !important; }
 
+  /* Barra superior única, a todo lo ancho: logo + título + tema */
+  header.app {
+    grid-area: header;
+    padding: 14px 28px;
+  }
+
+  /* La barra lateral queda debajo de la barra superior, sin repetir el logo */
   .drawer {
     grid-area: drawer;
     position: sticky;
     top: 0;
     left: auto;
-    height: 100vh;
+    align-self: stretch;
+    height: auto;
+    min-height: 100%;
     width: 100%;
     max-width: none;
     transform: none !important;
     box-shadow: none;
     border-right: 1px solid var(--border);
+    padding-top: 18px;
+    background: var(--surface);
   }
 
-  header.app {
-    grid-area: header;
+  .drawer-head { display: none; }
+
+  .drawer-item {
+    padding: 12px 22px;
+    border-radius: 0;
+    font-size: 14px;
+  }
+
+  .drawer-item.active {
+    box-shadow: inset 3px 0 0 var(--orange);
   }
 
   main {
     grid-area: main;
-    max-width: 980px;
-    padding: 28px 40px 60px;
+    max-width: 900px;
+    width: 100%;
+    margin: 0;
+    padding: 36px 44px 70px;
   }
 
-  .card { padding: 20px 24px; }
+  .section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
 
-  .acc-group { max-width: 720px; }
+  .card {
+    padding: 22px 26px;
+    margin-bottom: 16px;
+  }
+
+  .card h2 { font-size: 14px; }
+
+  .acc-group {
+    max-width: 640px;
+  }
+
+  .acc-header {
+    padding: 16px 4px;
+    font-size: 14.5px;
+  }
 
   #stock-card .prod-row,
   #proyeccion .prod-row,
-  #ventas-resumen .prod-row {
-    padding: 14px 0;
+  #ventas-resumen .prod-row,
+  .prod-row {
+    padding: 14px 2px;
   }
 
-  .grid2 { max-width: 480px; }
-  .grid3 { max-width: 620px; }
+  .prod-name { font-size: 15px; }
+  .stock-num { font-size: 20px; }
 
-  .btn-block { max-width: 420px; }
+  .grid2 { max-width: 460px; }
+  .grid3 { max-width: 600px; }
+
+  .btn { padding: 12px 20px; }
+  .btn-block { max-width: 380px; }
   #productos-lista .btn-block,
-  #carrito-card .btn-block { max-width: none; }
+  #carrito-card .btn-block,
+  .card .btn-block {
+    max-width: 380px;
+  }
+
+  .product-item { padding: 14px 2px; }
 
   .sheet {
-    max-width: 480px;
+    max-width: 460px;
     border-radius: var(--radius);
-    margin-bottom: 40px;
+    margin: 40px 0;
+    max-height: 88vh;
+    overflow-y: auto;
   }
   .overlay { align-items: center; }
+
+  .toast { left: calc(250px + (100% - 250px) / 2); }
 }
+
