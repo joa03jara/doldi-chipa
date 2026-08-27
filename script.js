@@ -504,6 +504,19 @@ function cerrarModal(id) {
   document.getElementById(id).classList.remove('show');
 }
 
+// Ventana de confirmación propia de la app (con el mismo estilo que todo lo
+// demás), en vez del cartel genérico del navegador con la URL del sitio.
+function confirmarAccion(titulo, mensaje, onAceptar) {
+  document.getElementById('confirm-generico-titulo').textContent = titulo;
+  document.getElementById('confirm-generico-mensaje').textContent = mensaje;
+  const btn = document.getElementById('confirm-generico-btn');
+  btn.onclick = () => {
+    cerrarModal('overlay-confirm-generico');
+    onAceptar();
+  };
+  mostrarOverlay('overlay-confirm-generico');
+}
+
 // Todas las ventanas emergentes (.overlay) comparten el mismo z-index en el CSS,
 // así que si una se abre desde adentro de otra (ej: "Elegir producto" desde
 // "Nuevo pedido"), sin esto quedaría tapada por la que ya estaba abierta según
@@ -616,10 +629,31 @@ function slugify(str) {
 
 const EMOJIS_PRODUCTO = ['🧀', '🥐', '🥪', '🍔', '🍕', '🌭', '🥖', '🍞', '🥟', '🍗', '🍟', '🍩', '🍪', '🧁', '🍰', '🥤', '☕', '🍦', '🥗', '🍫', '📦'];
 
+// Opciones de venta fijas para el modo "Por docena" — no hay que escribir
+// nombre ni cantidad a mano, solo tildar cuáles de estas tres usar.
+const OPCIONES_DOCENA = [{
+    key: 'media',
+    label: 'Media docena',
+    qty: 0.5,
+    checkboxId: 'pf-opt-media'
+  },
+  {
+    key: 'docena',
+    label: 'Docena',
+    qty: 1,
+    checkboxId: 'pf-opt-docena'
+  },
+  {
+    key: 'docenaymedia',
+    label: 'Docena y media',
+    qty: 1.5,
+    checkboxId: 'pf-opt-docenaymedia'
+  },
+];
+
 let pfEditId = null;
 let pfEmojiActual = '📦';
 let pfModoActual = 'libre';
-let pfVariantesActual = [];
 
 function abrirProductoForm(editId) {
   pfEditId = editId || null;
@@ -632,34 +666,24 @@ function abrirProductoForm(editId) {
   if (editId && STATE.productos[editId]) {
     const p = STATE.productos[editId];
     document.getElementById('pf-nombre').value = p.label || '';
-    document.getElementById('pf-unidad').value = p.unit || '';
     pfEmojiActual = p.emoji || '📦';
     pfModoActual = p.pricingMode || 'libre';
-    pfVariantesActual = (p.variantes || []).map(v => ({ ...v
-    }));
-    document.getElementById('pf-usa-paquete').checked = !!p.packSize;
-    document.getElementById('pf-paquete-nombre').value = p.packLabel || '';
-    document.getElementById('pf-paquete-cantidad').value = p.packSize || '';
+    OPCIONES_DOCENA.forEach(o => {
+      const yaEstaba = (p.variantes || []).some(v => v.key === o.key);
+      document.getElementById(o.checkboxId).checked = pfModoActual === 'variantes' ? yaEstaba : true;
+    });
   } else {
     document.getElementById('pf-nombre').value = '';
-    document.getElementById('pf-unidad').value = 'unidades';
     pfEmojiActual = '📦';
     pfModoActual = 'libre';
-    pfVariantesActual = [{
-      key: 'v' + Date.now(),
-      label: '1 unidad',
-      qty: 1
-    }];
-    document.getElementById('pf-usa-paquete').checked = false;
-    document.getElementById('pf-paquete-nombre').value = '';
-    document.getElementById('pf-paquete-cantidad').value = '';
+    OPCIONES_DOCENA.forEach(o => {
+      document.getElementById(o.checkboxId).checked = true;
+    });
   }
   document.getElementById('pf-precio-unidad').value = '';
 
   seleccionarEmojiForm(pfEmojiActual);
   seleccionarModoPrecio(pfModoActual);
-  renderVariantesForm();
-  togglePaqueteForm();
   mostrarOverlay('overlay-producto-form');
 }
 
@@ -676,36 +700,6 @@ function seleccionarModoPrecio(modo) {
   document.getElementById('pf-modo-variantes').classList.toggle('active', modo === 'variantes');
   document.getElementById('pf-precio-libre-wrap').style.display = modo === 'libre' ? 'block' : 'none';
   document.getElementById('pf-variantes-wrap').style.display = modo === 'variantes' ? 'block' : 'none';
-}
-
-function renderVariantesForm() {
-  const wrap = document.getElementById('pf-variantes-list');
-  wrap.innerHTML = pfVariantesActual.map((v, i) => `
-    <div class="variante-row">
-      <input class="vr-label" type="text" placeholder="Nombre (ej: Docena)" value="${v.label||''}" oninput="pfVariantesActual[${i}].label=this.value">
-      <input class="vr-qty" type="number" step="0.5" min="0.01" placeholder="Cant." value="${v.qty||''}" oninput="pfVariantesActual[${i}].qty=Number(this.value)||0">
-      <button class="vr-del" onclick="eliminarVarianteForm(${i})">✕</button>
-    </div>
-  `).join('');
-}
-
-function agregarVarianteForm() {
-  pfVariantesActual.push({
-    key: 'v' + Date.now() + Math.floor(Math.random() * 1000),
-    label: '',
-    qty: 1
-  });
-  renderVariantesForm();
-}
-
-function eliminarVarianteForm(i) {
-  pfVariantesActual.splice(i, 1);
-  renderVariantesForm();
-}
-
-function togglePaqueteForm() {
-  const on = document.getElementById('pf-usa-paquete').checked;
-  document.getElementById('pf-paquete-wrap').style.display = on ? 'block' : 'none';
 }
 
 async function guardarProducto(id, def) {
@@ -726,24 +720,23 @@ async function guardarProducto(id, def) {
 
 async function guardarProductoForm() {
   const nombre = document.getElementById('pf-nombre').value.trim();
-  const unidad = document.getElementById('pf-unidad').value.trim() || 'unidades';
   if (!nombre) {
     showToast('Ponele un nombre al producto');
     return;
   }
+
+  let variantes = [];
   if (pfModoActual === 'variantes') {
-    pfVariantesActual = pfVariantesActual.filter(v => v.label && v.qty > 0);
-    if (pfVariantesActual.length === 0) {
-      showToast('Agregá al menos una opción de venta con nombre y cantidad');
+    variantes = OPCIONES_DOCENA.filter(o => document.getElementById(o.checkboxId).checked)
+      .map(o => ({
+        key: o.key,
+        label: o.label,
+        qty: o.qty
+      }));
+    if (variantes.length === 0) {
+      showToast('Tildá al menos una opción de venta (media docena, docena, etc.)');
       return;
     }
-  }
-  const usaPaquete = document.getElementById('pf-usa-paquete').checked;
-  const packLabel = document.getElementById('pf-paquete-nombre').value.trim();
-  const packSize = Number(document.getElementById('pf-paquete-cantidad').value) || 0;
-  if (usaPaquete && (!packLabel || packSize <= 0)) {
-    showToast('Completá el nombre y la cantidad del paquete');
-    return;
   }
 
   let id = pfEditId;
@@ -760,15 +753,11 @@ async function guardarProductoForm() {
   const def = {
     label: nombre,
     emoji: pfEmojiActual,
-    unit: unidad,
+    unit: pfModoActual === 'variantes' ? 'docenas' : 'unidades',
     pricingMode: pfModoActual,
-    variantes: pfModoActual === 'variantes' ? pfVariantesActual.map(v => ({
-      key: v.key,
-      label: v.label,
-      qty: Number(v.qty)
-    })) : [],
-    packSize: usaPaquete ? packSize : null,
-    packLabel: usaPaquete ? packLabel : null,
+    variantes,
+    packSize: null,
+    packLabel: null,
     orden: (STATE.productos[id] && STATE.productos[id].orden != null) ? STATE.productos[id].orden : Object.keys(STATE.productos).length
   };
 
@@ -783,8 +772,11 @@ function confirmarEliminarProducto() {
   if (!pfEditId) return;
   const p = STATE.productos[pfEditId];
   const nombre = p ? p.label : pfEditId;
-  if (!confirm('¿Eliminar "' + nombre + '"? El stock y las ventas ya registradas no se borran, pero el producto va a dejar de aparecer para vender.')) return;
-  eliminarProductoUI(pfEditId);
+  confirmarAccion(
+    'Eliminar ' + nombre,
+    'El stock y las ventas ya registradas no se borran, pero el producto va a dejar de aparecer para vender.',
+    () => eliminarProductoUI(pfEditId)
+  );
 }
 
 async function eliminarProductoUI(id) {
@@ -1526,11 +1518,11 @@ function seleccionarPremioVenta(id) {
 }
 
 /* ================= VENTA FLOW ================= */
-let envioSeleccionado = null; // null | 'cerca' | 'lejos'
+let envioSeleccionado; // undefined = todavía no se eligió | null = "Sin envío" elegido a propósito | 'cerca' | 'lejos'
 let carrito = []; // items del pedido actual: {prod, optKey, qty, label, monto}
 let destinoAgregar = 'venta'; // 'venta' | 'pedido' — a dónde van los productos que se eligen
 let pedidoItemsActual = []; // items del pedido de la libreta que se está armando
-let pedidoEnvioActual = null;
+let pedidoEnvioActual; // mismo criterio que envioSeleccionado
 
 function stockDisponiblePedido(prod) {
   const enCarrito = carrito.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
@@ -1620,7 +1612,7 @@ function vaciarCarrito() {
 function abrirPedidoForm() {
   destinoAgregar = 'pedido';
   pedidoItemsActual = [];
-  pedidoEnvioActual = null;
+  pedidoEnvioActual = undefined;
   document.getElementById('ped-cliente').value = '';
   renderPedidoItems();
   renderPedidoEnvioOpts();
@@ -1689,6 +1681,10 @@ async function guardarPedido() {
     showToast('Agregá al menos un producto al pedido');
     return;
   }
+  if (typeof pedidoEnvioActual === 'undefined') {
+    showToast('Elegí una opción de envío (o "Sin envío") antes de guardar');
+    return;
+  }
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
@@ -1704,7 +1700,7 @@ async function guardarPedido() {
     cerrarModal('overlay-pedido-form');
     showToast('Pedido de ' + cliente + ' anotado ✓');
     pedidoItemsActual = [];
-    pedidoEnvioActual = null;
+    pedidoEnvioActual = undefined;
   } catch (e) {
     showToast('No se pudo guardar el pedido');
   }
@@ -1816,9 +1812,16 @@ async function confirmarPedidoListo(id) {
   renderCaja();
 }
 
-async function eliminarPedidoUI(id) {
+function eliminarPedidoUI(id) {
   const pedido = STATE.pedidos.find(p => p.id === id);
-  if (!confirm('¿Eliminar el pedido de "' + (pedido ? pedido.cliente : '') + '"? No se puede deshacer.')) return;
+  confirmarAccion(
+    'Eliminar pedido de ' + (pedido ? pedido.cliente : ''),
+    'No se puede deshacer.',
+    () => eliminarPedidoConfirmado(id)
+  );
+}
+
+async function eliminarPedidoConfirmado(id) {
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
@@ -1852,7 +1855,7 @@ function abrirFinalizarPedido() {
       <div class="stock-num">${fmtMoney(subtotal)}</div>
     </div>
   `;
-  envioSeleccionado = null;
+  envioSeleccionado = undefined;
   clienteVentaActual = null;
   premioSeleccionadoVenta = null;
   document.getElementById('venta-cliente-dni').value = '';
@@ -1903,6 +1906,10 @@ function aplicarDescuentoAItems(items, descuentoTotal) {
 
 async function confirmarVenta() {
   if (carrito.length === 0) return;
+  if (typeof envioSeleccionado === 'undefined') {
+    showToast('Elegí una opción de envío (o "Sin envío") antes de confirmar');
+    return;
+  }
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
@@ -2006,7 +2013,7 @@ async function confirmarVenta() {
     cerrarModal('overlay-confirm');
     showToast('Pedido registrado · ' + fmtMoney(total) + (premioSeleccionadoVenta ? ' · Premio aplicado: ' + premioSeleccionadoVenta.nombre : ''));
     carrito = [];
-    envioSeleccionado = null;
+    envioSeleccionado = undefined;
     clienteVentaActual = null;
     premioSeleccionadoVenta = null;
     renderCarrito();
@@ -2028,15 +2035,12 @@ function abrirEditarStock(prod) {
   document.getElementById('editar-stock-title').textContent = p.label + ' — Stock';
 
   // Sección "Agregar stock"
-  document.getElementById('agregar-stock-label').textContent = p.packSize ?
-    ('Cantidad de ' + (p.packLabel || 'paquetes') + ' (' + p.packSize + ' ' + p.unit + ' c/u)') :
-    ('Cantidad de ' + p.unit + ' a agregar');
+  document.getElementById('agregar-stock-label').textContent = 'Cantidad de ' + p.unit + ' a agregar';
   const agregarInput = document.getElementById('agregar-stock-input');
   agregarInput.value = '';
   agregarInput.style.borderColor = 'var(--border)';
-  agregarInput.step = '1';
+  agregarInput.step = '0.5';
   document.getElementById('agregar-stock-preview').textContent = '';
-  actualizarPreviewAgregarStock();
 
   // Sección "Corregir cantidad exacta"
   const editarInput = document.getElementById('editar-stock-input');
@@ -2049,14 +2053,8 @@ function abrirEditarStock(prod) {
 }
 
 function actualizarPreviewAgregarStock() {
-  if (!editarStockProd) return;
-  const p = STATE.productos[editarStockProd];
-  const val = Number(document.getElementById('agregar-stock-input').value) || 0;
-  if (p.packSize) {
-    document.getElementById('agregar-stock-preview').textContent = val > 0 ? '= ' + (val * p.packSize) + ' ' + p.unit : '';
-  } else {
-    document.getElementById('agregar-stock-preview').textContent = '';
-  }
+  // El sistema de "paquetes" (bolsas de X unidades) ya no existe: sumar
+  // stock es simplemente sumar el número que se cargue, sin conversión.
 }
 
 async function confirmarAgregarStock() {
@@ -2069,13 +2067,11 @@ async function confirmarAgregarStock() {
   }
   input.style.borderColor = 'var(--border)';
   const p = STATE.productos[editarStockProd];
-  const aAgregar = p.packSize ? val * p.packSize : val;
-  STATE.stock[editarStockProd] = (STATE.stock[editarStockProd] || 0) + aAgregar;
+  STATE.stock[editarStockProd] = (STATE.stock[editarStockProd] || 0) + val;
   const ok = await saveStock();
   if (ok) {
-    showToast('+ ' + aAgregar + ' ' + p.unit + ' de ' + p.label + ' agregadas ✓');
+    showToast('+ ' + val + ' ' + p.unit + ' de ' + p.label + ' agregadas ✓');
     input.value = '';
-    document.getElementById('agregar-stock-preview').textContent = '';
     document.getElementById('editar-stock-input').value = STATE.stock[editarStockProd];
   }
   renderStock();
@@ -2134,8 +2130,12 @@ async function confirmarReinicio() {
   }
   try {
     await db.collection('doldichipa').doc('stock').set({});
+    await db.collection('doldichipa').doc('caja').set({
+      total: 0
+    });
     await borrarColeccion('doldichipa_ventas');
     await borrarColeccion('doldichipa_remis');
+    await borrarColeccion('doldichipa_pedidos');
     cerrarModal('overlay-reset');
     showToast('Sistema reiniciado ✓ Todo en cero');
     irATab('stock');

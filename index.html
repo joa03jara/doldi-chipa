@@ -614,8 +614,10 @@
         <li>Todo el stock cargado (vuelve a 0)</li>
         <li>Todo el historial de ventas</li>
         <li>Todos los ingresos y gastos de Remis</li>
+        <li>El total de Caja (vuelve a $0)</li>
+        <li>Todos los pedidos de la libreta (en espera y completados)</li>
       </ul>
-      <p class="muted" style="margin-top:8px;">Los precios que cargaste <b>no</b> se borran.</p>
+      <p class="muted" style="margin-top:8px;">Los productos y los precios que cargaste <b>no</b> se borran.</p>
       <p class="muted" style="margin-top:8px; font-weight:700; color:var(--red);">Esta acción no se puede deshacer.</p>
       <button class="btn btn-rust btn-block" style="margin-top:16px;" onclick="confirmarReinicio()">Sí, borrar todo y empezar de cero</button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="cerrarModal('overlay-reset')">Cancelar</button>
@@ -681,15 +683,10 @@
       </div>
 
       <div class="form-field">
-        <label>Unidad de medida (cómo contás el stock)</label>
-        <input type="text" id="pf-unidad" placeholder="Ej: unidades, docenas, kg">
-      </div>
-
-      <div class="form-field">
         <label>¿Cómo se vende?</label>
         <div class="mode-toggle">
-          <div class="mode-opt" id="pf-modo-libre" onclick="seleccionarModoPrecio('libre')">Cantidad libre<br><span style="font-weight:500;">(precio por unidad)</span></div>
-          <div class="mode-opt" id="pf-modo-variantes" onclick="seleccionarModoPrecio('variantes')">Paquetes fijos<br><span style="font-weight:500;">(ej: docena)</span></div>
+          <div class="mode-opt" id="pf-modo-libre" onclick="seleccionarModoPrecio('libre')">Por unidad</div>
+          <div class="mode-opt" id="pf-modo-variantes" onclick="seleccionarModoPrecio('variantes')">Por docena</div>
         </div>
       </div>
 
@@ -700,22 +697,17 @@
 
       <div id="pf-variantes-wrap" style="display:none;">
         <label style="display:block; font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.3px; margin-bottom:8px;">Opciones de venta</label>
-        <div id="pf-variantes-list"></div>
-        <button class="btn btn-sm btn-ghost" onclick="agregarVarianteForm()">+ Agregar opción</button>
-      </div>
-
-      <div class="form-check" style="margin-top:16px;">
-        <input type="checkbox" id="pf-usa-paquete" onchange="togglePaqueteForm()">
-        <label for="pf-usa-paquete" style="margin:0;">Cargo el stock en paquetes (ej: bolsas)</label>
-      </div>
-      <div id="pf-paquete-wrap" style="display:none;">
-        <div class="form-field">
-          <label>Nombre del paquete</label>
-          <input type="text" id="pf-paquete-nombre" placeholder="Ej: bolsa">
+        <div class="form-check">
+          <input type="checkbox" id="pf-opt-media" checked>
+          <label for="pf-opt-media" style="margin:0;">Media docena</label>
         </div>
-        <div class="form-field">
-          <label id="pf-paquete-cantidad-label">Cantidad por paquete (en la unidad de medida)</label>
-          <input type="number" id="pf-paquete-cantidad" min="1" step="1">
+        <div class="form-check">
+          <input type="checkbox" id="pf-opt-docena" checked>
+          <label for="pf-opt-docena" style="margin:0;">Docena</label>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" id="pf-opt-docenaymedia" checked>
+          <label for="pf-opt-docenaymedia" style="margin:0;">Docena y media</label>
         </div>
       </div>
 
@@ -734,6 +726,17 @@
       <div class="qr-box"><canvas id="producto-qr-venta"></canvas></div>
       <p class="muted" style="font-weight:700; margin:14px 0 4px;" id="producto-qr-carga-label">Código de carga</p>
       <div class="qr-box"><canvas id="producto-qr-carga"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CONFIRMACIÓN GENÉRICA (reemplaza el cartel feo del navegador) -->
+  <div class="overlay" id="overlay-confirm-generico">
+    <div class="sheet sheet-wrap">
+      <button class="close" onclick="cerrarModal('overlay-confirm-generico')">✕</button>
+      <h3 id="confirm-generico-titulo" style="color:var(--red);">Confirmar</h3>
+      <p class="muted" id="confirm-generico-mensaje" style="margin-top:8px;"></p>
+      <button class="btn btn-rust btn-block" id="confirm-generico-btn" style="margin-top:16px;">Sí, eliminar</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="cerrarModal('overlay-confirm-generico')">Cancelar</button>
     </div>
   </div>
 
