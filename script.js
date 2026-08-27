@@ -277,7 +277,7 @@ function conectarFirebase() {
   }
   localStorage.setItem('doldi_fb_config', JSON.stringify(cfg));
   initFirebase(cfg);
-  showToast('Conectado a la nube ✓');
+  showToast('Conectado a la nube');
   irATab('stock');
 }
 
@@ -411,7 +411,7 @@ async function guardarConfigPuntos() {
     }, {
       merge: true
     });
-    showToast('Configuración guardada ✓');
+    showToast('Configuración guardada');
   } catch (e) {
     showToast('No se pudo guardar');
   }
@@ -764,7 +764,7 @@ async function guardarProductoForm() {
   const ok = await guardarProducto(id, def);
   if (ok) {
     cerrarModal('overlay-producto-form');
-    showToast('Producto guardado ✓');
+    showToast('Producto guardado');
   }
 }
 
@@ -965,8 +965,8 @@ async function guardarPrecios() {
   const ok = await savePrecios();
   if (ok) {
     showToast(faltantes > 0 ?
-      ('Precios guardados ✓ (quedaron ' + faltantes + ' en $0)') :
-      'Precios guardados ✓');
+      ('Precios guardados (quedaron ' + faltantes + ' en $0)') :
+      'Precios guardados');
   }
   renderVender();
   renderStock();
@@ -1160,7 +1160,7 @@ async function confirmarRemisMov() {
     STATE.caja.total = (STATE.caja.total || 0) + (remisMovTipo === 'ingreso' ? monto : -monto);
     await saveCaja();
     cerrarModal('overlay-remis-mov');
-    showToast((remisMovTipo === 'ingreso' ? 'Ingreso' : 'Gasto') + ' registrado ✓');
+    showToast((remisMovTipo === 'ingreso' ? 'Ingreso' : 'Gasto') + ' registrado');
     renderCaja();
   }
 }
@@ -1190,7 +1190,7 @@ async function confirmarAjustarCaja() {
   const ok = await saveCaja();
   if (ok) {
     cerrarModal('overlay-ajustar-caja');
-    showToast('Saldo actualizado ✓');
+    showToast('Saldo actualizado');
   }
   renderCaja();
 }
@@ -1339,7 +1339,7 @@ async function guardarPremioForm() {
   const ok = await addPremio(premio);
   if (ok) {
     cerrarModal('overlay-premio-form');
-    showToast('Premio guardado ✓');
+    showToast('Premio guardado');
   }
 }
 
@@ -1698,7 +1698,7 @@ async function guardarPedido() {
       creadoTs: Date.now()
     });
     cerrarModal('overlay-pedido-form');
-    showToast('Pedido de ' + cliente + ' anotado ✓');
+    showToast('Pedido guardado');
     pedidoItemsActual = [];
     pedidoEnvioActual = undefined;
   } catch (e) {
@@ -1797,7 +1797,7 @@ async function confirmarPedidoListo(id) {
     const siguiente = STATE.pedidos
       .filter(p => p.estado === 'pendiente' && p.id !== id)
       .sort((a, b) => a.creadoTs - b.creadoTs)[0];
-    let msg = 'Pedido de ' + pedido.cliente + ' listo ✓';
+    let msg = 'Pedido de ' + pedido.cliente + ' listo';
     msg += siguiente ?
       (' — Sigue: ' + siguiente.cliente + ' (' + resumenItemsPedido(siguiente.items) + ')') :
       ' — No quedan más pedidos en espera';
@@ -2070,7 +2070,7 @@ async function confirmarAgregarStock() {
   STATE.stock[editarStockProd] = (STATE.stock[editarStockProd] || 0) + val;
   const ok = await saveStock();
   if (ok) {
-    showToast('+ ' + val + ' ' + p.unit + ' de ' + p.label + ' agregadas ✓');
+    showToast(p.label + ': stock actualizado');
     input.value = '';
     document.getElementById('editar-stock-input').value = STATE.stock[editarStockProd];
   }
@@ -2092,7 +2092,7 @@ async function confirmarEditarStock() {
   const ok = await saveStock();
   if (ok) {
     cerrarModal('overlay-editar-stock');
-    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' actualizado ✓');
+    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' actualizado');
   }
   renderStock();
   renderVender();
@@ -2102,7 +2102,7 @@ async function vaciarStock() {
   const ok = await saveStock();
   if (ok) {
     cerrarModal('overlay-editar-stock');
-    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' vaciado ✓');
+    showToast('Stock de ' + STATE.productos[editarStockProd].label + ' vaciado');
   }
   renderStock();
   renderVender();
@@ -2137,7 +2137,7 @@ async function confirmarReinicio() {
     await borrarColeccion('doldichipa_remis');
     await borrarColeccion('doldichipa_pedidos');
     cerrarModal('overlay-reset');
-    showToast('Sistema reiniciado ✓ Todo en cero');
+    showToast('Sistema reiniciado. Todo en cero.');
     irATab('stock');
   } catch (e) {
     showToast('No se pudo reiniciar, revisá la conexión');
@@ -2307,7 +2307,7 @@ function handleScanResult(text) {
       const cant = Number(parts[3]) || p.packSize || 1;
       STATE.stock[prod] = (STATE.stock[prod] || 0) + cant;
       saveStock();
-      showToast('+ ' + cant + ' ' + p.unit + ' de ' + p.label + ' cargadas ✓');
+      showToast(p.label + ': stock actualizado');
       renderStock();
       renderVender();
     }
