@@ -1802,6 +1802,18 @@ function ubicacionHref(direccion) {
   return /^https?:\/\//i.test(txt) ? txt : ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(txt));
 }
 
+// Mapa embebido (sin salir de la app). Si el link tiene coordenadas (como los
+// que manda WhatsApp al compartir ubicación), las usa directo; si no, usa el
+// texto tal cual (funciona también con direcciones escritas a mano).
+function ubicacionEmbedSrc(direccion) {
+  if (!direccion) return null;
+  const txt = direccion.trim();
+  if (!txt) return null;
+  const matchLatLng = txt.match(/(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/);
+  const query = matchLatLng ? (matchLatLng[1] + ',' + matchLatLng[2]) : txt;
+  return 'https://maps.google.com/maps?q=' + encodeURIComponent(query) + '&z=15&output=embed';
+}
+
 function renderPedidos() {
   const pendientes = STATE.pedidos.filter(p => p.estado === 'pendiente').sort((a, b) => a.creadoTs - b.creadoTs);
   const wrap = document.getElementById('pedidos-lista');
@@ -1812,6 +1824,7 @@ function renderPedidos() {
       const subtotal = (p.items || []).reduce((s, i) => s + i.monto, 0) + (p.envio ? ((STATE.precios.envio && STATE.precios.envio[p.envio]) || 0) : 0);
       const esPrimero = idx === 0;
       const href = ubicacionHref(p.direccion);
+      const embedSrc = ubicacionEmbedSrc(p.direccion);
       return `<div class="product-item" style="align-items:flex-start; ${esPrimero?'background:var(--orange-soft); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; border-bottom:none;':'padding-bottom:14px;'}">
         <div style="flex:1;">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -1820,7 +1833,8 @@ function renderPedidos() {
           </div>
           <div class="unit-tag" style="white-space:normal;">${resumenItemsPedido(p.items)}${p.envio ? ' + envío ' + p.envio : ''}</div>
           <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
-          ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; text-decoration:none;">📍 Ver ubicación</a>` : ''}
+          ${embedSrc ? `<iframe src="${embedSrc}" width="100%" height="150" style="border:0; border-radius:10px; margin-top:8px; display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : ''}
+          ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; text-decoration:none;">📍 Cómo llegar</a>` : ''}
         </div>
         <div class="pi-actions" style="flex-direction:column; align-items:stretch;">
           <button class="btn btn-sm btn-green" onclick="marcarListoDesdePedido('${p.id}')">Marcar listo</button>
