@@ -1057,3 +1057,37 @@ main {
   .toast { left: calc(250px + (100% - 250px) / 2); }
 }
 
+
+/* ================= HISTORIAL (barras por día/semana/mes) ================= */
+.historial-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.historial-row:last-child { border-bottom: none; }
+.historial-row .historial-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+}
+.historial-row .historial-label {
+  font-weight: 600;
+  color: var(--text);
+}
+.historial-row .historial-monto {
+  font-weight: 800;
+  color: var(--orange-dark);
+}
+.historial-bar-track {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+.historial-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--orange-dark));
+  border-radius: 6px 0 0 6px;
+}
