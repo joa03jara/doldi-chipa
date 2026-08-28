@@ -1650,7 +1650,7 @@ function iniciarVenta(prod, optKey, customOpt) {
 function abrirPedidoForm(editId) {
   pedidoEditId = editId || null;
   document.getElementById('pedido-form-title').textContent = editId ? 'Editar pedido' : 'Nuevo pedido';
-  document.getElementById('ped-guardar-btn').textContent = editId ? 'Guardar cambios' : 'Guardar en la fila';
+  document.getElementById('ped-guardar-btn').textContent = editId ? 'Guardar cambios' : 'Guardar pedido';
 
   if (editId) {
     const pedido = STATE.pedidos.find(p => p.id === editId);
@@ -1685,6 +1685,7 @@ function renderPedidoItems() {
   }
   const subtotal = pedidoItemsActual.reduce((s, i) => s + i.monto, 0);
   document.getElementById('ped-subtotal').textContent = fmtMoney(subtotal);
+  actualizarTotalPedidoForm();
 }
 
 function quitarDePedidoActual(idx) {
@@ -1719,6 +1720,15 @@ function renderPedidoEnvioOpts() {
 function seleccionarEnvioPedido(key) {
   pedidoEnvioActual = key;
   renderPedidoEnvioOpts();
+  actualizarTotalPedidoForm();
+}
+
+// El envío elegido tiene que reflejarse al toque en el total mostrado en el
+// formulario, no recién después de guardar o vender.
+function actualizarTotalPedidoForm() {
+  const subtotal = pedidoItemsActual.reduce((s, i) => s + i.monto, 0);
+  const envioMonto = pedidoEnvioActual ? ((STATE.precios.envio && STATE.precios.envio[pedidoEnvioActual]) || 0) : 0;
+  document.getElementById('ped-total').textContent = fmtMoney(subtotal + envioMonto);
 }
 
 function validarPedidoForm() {
@@ -1770,22 +1780,6 @@ async function guardarPedido() {
 // Vender un pedido ahora mismo: reusa la misma pantalla de checkout que ya
 // tiene fecha/hora, cliente con puntos y premios — solo cambia de dónde
 // vienen los ítems.
-function venderAhora() {
-  if (!validarPedidoForm()) return;
-  const cliente = document.getElementById('ped-cliente').value.trim() || 'Sin nombre';
-  carrito = pedidoItemsActual.map(i => ({ ...i
-  }));
-  pedidoOrigenId = pedidoEditId; // si estaba editando un pedido en espera, se termina ese mismo
-  pedidoClienteVentaAhora = cliente;
-  const envioElegido = pedidoEnvioActual;
-  pedidoItemsActual = [];
-  pedidoEnvioActual = undefined;
-  pedidoEditId = null;
-  cerrarModal('overlay-pedido-form');
-  abrirFinalizarPedido();
-  seleccionarEnvio(envioElegido);
-}
-
 function resumenItemsPedido(items) {
   return (items || []).map(i => i.label + ' de ' + (STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod)).join(', ');
 }
