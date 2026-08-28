@@ -204,26 +204,6 @@
       </div>
       <div class="total-banner">
         <div class="big" id="ventas-total">$0</div>
-        <div class="lbl" id="ventas-count">0 ventas</div>
-      </div>
-      <div class="card" id="ventas-resumen"></div>
-      <div class="card">
-        <h2>Historial</h2>
-        <input type="text" id="ventas-search" placeholder="Buscar por producto, monto o fecha (ej: factura, 4500, 09/08)" oninput="renderVentas()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
-        <div id="ventas-list"></div>
-      </div>
-    </section>
-
-    <!-- RESUMEN GENERAL -->
-    <section class="tab-panel" id="tab-resumen">
-      <div class="section-title">Resumen general</div>
-      <div class="segmented">
-        <button class="active" data-range="hoy" onclick="cambiarRangoResumen('hoy')">Hoy</button>
-        <button data-range="semana" onclick="cambiarRangoResumen('semana')">7 días</button>
-        <button data-range="todo" onclick="cambiarRangoResumen('todo')">Todo</button>
-      </div>
-      <div class="total-banner">
-        <div class="big" id="resumen-total">$0</div>
         <div class="lbl">Total general (Doldi Chipa + Remis)</div>
       </div>
       <div class="card">
@@ -259,6 +239,15 @@
       </div>
       <div class="card">
         <div id="historial-lista"></div>
+      </div>
+
+      <div class="section-title" style="margin-top:26px; font-size:18px;">Detalle de ventas</div>
+      <div class="lbl" id="ventas-count" style="margin:-8px 0 12px 4px; color:var(--text-2); font-size:12.5px;">0 ventas</div>
+      <div class="card" id="ventas-resumen"></div>
+      <div class="card">
+        <h2>Historial</h2>
+        <input type="text" id="ventas-search" placeholder="Buscar por producto, monto o fecha (ej: factura, 4500, 09/08)" oninput="renderVentas()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
+        <div id="ventas-list"></div>
       </div>
     </section>
 
@@ -413,13 +402,6 @@
         <path d="M18 17V9M13 17V5M8 17v-4" />
       </svg>
       Ventas
-    </button>
-    <button class="drawer-item" data-tab="resumen" onclick="irATab('resumen')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3.5 2" />
-      </svg>
-      Resumen general
     </button>
     <button class="drawer-item" data-tab="clientes" onclick="irATab('clientes')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -566,9 +566,10 @@ function irATab(name) {
   else if (name === 'productos') renderProductosLista();
   else if (name === 'pedidos') renderPedidos();
   else if (name === 'caja') renderCaja();
-  else if (name === 'ventas') renderVentas();
-  else if (name === 'remis') renderRemis();
-  else if (name === 'resumen') renderResumen();
+  else if (name === 'ventas') {
+    renderVentas();
+    renderResumen();
+  } else if (name === 'remis') renderRemis();
   else if (name === 'vender') renderVender();
   else if (name === 'clientes') {
     renderPremios();
@@ -946,22 +947,13 @@ let rangoVentas = 'hoy';
 
 function cambiarRango(r) {
   rangoVentas = r;
-  document.querySelectorAll('.segmented button').forEach(b => b.classList.toggle('active', b.dataset.range === r));
+  document.querySelectorAll('.segmented button[data-range]').forEach(b => b.classList.toggle('active', b.dataset.range === r));
   renderVentas();
+  renderResumen();
 }
 
 function renderVentas() {
-  const now = Date.now();
-  let list = STATE.ventas.slice().sort((a, b) => b.ts - a.ts);
-  if (rangoVentas === 'hoy') {
-    const startToday = new Date();
-    startToday.setHours(0, 0, 0, 0);
-    list = list.filter(v => v.ts >= startToday.getTime());
-  } else if (rangoVentas === 'semana') {
-    list = list.filter(v => v.ts >= now - 7 * 24 * 60 * 60 * 1000);
-  }
-  const total = list.reduce((s, v) => s + v.monto, 0);
-  document.getElementById('ventas-total').textContent = fmtMoney(total);
+  let list = filtrarPorRango(STATE.ventas, rangoVentas).slice().sort((a, b) => b.ts - a.ts);
   document.getElementById('ventas-count').textContent = list.length + (list.length === 1 ? ' venta' : ' ventas');
 
   // Resumen agregado por producto (suma de docenas/unidades, sin separar por media/docena/docena y media)
@@ -1030,8 +1022,54 @@ function renderVentas() {
       <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
       <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${hora}</div></div>
       <div class="m">${fmtMoney(v.monto)}</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarVentaUI('${v.id}')">✕</button>
     </div>`;
   }).join('');
+}
+
+function eliminarVentaUI(id) {
+  const venta = STATE.ventas.find(v => v.id === id);
+  if (!venta) return;
+  const nombreProd = STATE.productos[venta.prod] ? STATE.productos[venta.prod].label : venta.prod;
+  confirmarAccion(
+    'Eliminar venta de ' + nombreProd,
+    'Se devuelve el stock vendido y se descuenta ' + fmtMoney(venta.monto) + ' de la caja. No se puede deshacer.',
+    () => eliminarVentaConfirmada(id)
+  );
+}
+
+async function eliminarVentaConfirmada(id) {
+  const venta = STATE.ventas.find(v => v.id === id);
+  if (!venta) return;
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    STATE.stock[venta.prod] = (STATE.stock[venta.prod] || 0) + (venta.qty || 0);
+    STATE.caja.total = (STATE.caja.total || 0) - (venta.monto || 0);
+    const promesas = [
+      db.collection('doldichipa_ventas').doc(id).delete(),
+      saveStock(),
+      saveCaja()
+    ];
+    // Si esta era la última venta de ese pedido, también se saca de "Completados hoy"
+    if (venta.pedidoId) {
+      const quedanOtras = STATE.ventas.some(v => v.id !== id && v.pedidoId === venta.pedidoId);
+      if (!quedanOtras) {
+        promesas.push(db.collection('doldichipa_pedidos').doc(venta.pedidoId).delete().catch(() => {}));
+      }
+    }
+    await Promise.all(promesas);
+    showToast('Venta eliminada');
+  } catch (e) {
+    showToast('No se pudo eliminar la venta');
+  }
+  renderVentas();
+  renderStock();
+  renderCaja();
+  renderResumen();
+  renderPedidos();
 }
 
 /* ================= FILTRO POR RANGO (compartido) ================= */
@@ -1165,24 +1203,17 @@ async function confirmarAjustarCaja() {
   renderCaja();
 }
 
-/* ================= RESUMEN GENERAL ================= */
-let rangoResumen = 'hoy';
-
-function cambiarRangoResumen(r) {
-  rangoResumen = r;
-  document.querySelectorAll('#tab-resumen .segmented button').forEach(b => b.classList.toggle('active', b.dataset.range === r));
-  renderResumen();
-}
+/* ================= RESUMEN GENERAL (comparte el rango con Ventas) ================= */
 
 function renderResumen() {
-  const ventasList = filtrarPorRango(STATE.ventas, rangoResumen);
+  const ventasList = filtrarPorRango(STATE.ventas, rangoVentas);
   const totalChipa = ventasList.reduce((s, v) => s + v.monto, 0);
-  const remisList = filtrarPorRango(STATE.remis, rangoResumen);
+  const remisList = filtrarPorRango(STATE.remis, rangoVentas);
   const ingresos = remisList.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + m.monto, 0);
   const gastos = remisList.filter(m => m.tipo === 'gasto').reduce((s, m) => s + m.monto, 0);
   const netoRemis = ingresos - gastos;
   const total = totalChipa + netoRemis;
-  document.getElementById('resumen-total').textContent = fmtMoney(total);
+  document.getElementById('ventas-total').textContent = fmtMoney(total);
   document.getElementById('resumen-chipa').textContent = fmtMoney(totalChipa);
   document.getElementById('resumen-remis').textContent = fmtMoney(netoRemis);
   renderHistorial();
@@ -1193,7 +1224,7 @@ let periodoHistorial = 'dia';
 
 function cambiarPeriodoHistorial(p) {
   periodoHistorial = p;
-  document.querySelectorAll('#tab-resumen .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
+  document.querySelectorAll('#tab-ventas .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
   renderHistorial();
 }
 
@@ -2004,7 +2035,8 @@ async function confirmarVenta() {
       qty: item.qty,
       qtyLabel: item.label,
       monto: item.monto + (esUltimo ? envioMonto : 0),
-      envio: esUltimo ? envioSeleccionado : null
+      envio: esUltimo ? envioSeleccionado : null,
+      pedidoId: pedidoOrigenId
     });
   });
 
