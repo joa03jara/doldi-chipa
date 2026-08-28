@@ -90,9 +90,6 @@ let STATE = {
   },
   puntosPorMil: 1
 };
-let scannerStream = null;
-let scannerLoopId = null;
-let scannerMode = 'venta'; // venta | carga
 let db = null;
 let firebaseConnected = false;
 
@@ -612,7 +609,6 @@ function renderProductosLista() {
         <div class="unit-tag">${p.unit} · ${detalle}</div>
       </div>
       <div class="pi-actions">
-        <button class="btn btn-sm btn-ghost" onclick="abrirProductoQR('${id}')">QR</button>
         <button class="btn btn-sm btn-ghost" onclick="abrirProductoForm('${id}')">Editar</button>
       </div>
     </div>`;
@@ -793,32 +789,6 @@ async function eliminarProductoUI(id) {
   }
 }
 
-function abrirProductoQR(id) {
-  const p = STATE.productos[id];
-  if (!p) return;
-  document.getElementById('producto-qr-title').textContent = p.label + ' — Códigos QR';
-  const ventaTxt = 'DOLDI:VENTA:' + id;
-  const cargaCant = p.packSize || 1;
-  const cargaTxt = 'DOLDI:CARGA:' + id + ':' + cargaCant;
-  document.getElementById('producto-qr-carga-label').textContent = p.packSize ?
-    ('Código de carga (1 ' + (p.packLabel || 'paquete') + ' = ' + p.packSize + ' ' + p.unit + ')') :
-    ('Código de carga (agrega 1 ' + p.unit.replace(/s$/, '') + ')');
-  try {
-    if (typeof QRCode !== 'undefined') {
-      QRCode.toCanvas(document.getElementById('producto-qr-venta'), ventaTxt, {
-        width: 200
-      });
-      QRCode.toCanvas(document.getElementById('producto-qr-carga'), cargaTxt, {
-        width: 200
-      });
-    } else {
-      showToast('No se pudo cargar el generador de QR (revisá tu conexión a internet)');
-    }
-  } catch (e) {
-    showToast('No se pudo generar el QR');
-  }
-  mostrarOverlay('overlay-producto-qr');
-}
 
 function renderVender() {
   // La pestaña Vender ya no muestra resumen de stock (se sacó a pedido).
@@ -1215,6 +1185,115 @@ function renderResumen() {
   document.getElementById('resumen-total').textContent = fmtMoney(total);
   document.getElementById('resumen-chipa').textContent = fmtMoney(totalChipa);
   document.getElementById('resumen-remis').textContent = fmtMoney(netoRemis);
+  renderHistorial();
+}
+
+/* ================= HISTORIAL (por día / semana / mes) ================= */
+let periodoHistorial = 'dia';
+
+function cambiarPeriodoHistorial(p) {
+  periodoHistorial = p;
+  document.querySelectorAll('#tab-resumen .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
+  renderHistorial();
+}
+
+// Clave y etiqueta de cada "balde" de tiempo, según el período elegido.
+function claveYEtiquetaPeriodo(ts, tipo) {
+  const d = new Date(ts);
+  if (tipo === 'dia') {
+    const clave = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const etiqueta = d.toLocaleDateString('es-AR', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit'
+    });
+    return {
+      clave,
+      etiqueta,
+      orden: d.setHours(0, 0, 0, 0)
+    };
+  }
+  if (tipo === 'semana') {
+    // Semana que arranca el lunes.
+    const diaSemana = (d.getDay() + 6) % 7; // 0 = lunes
+    const lunes = new Date(d);
+    lunes.setHours(0, 0, 0, 0);
+    lunes.setDate(d.getDate() - diaSemana);
+    const clave = lunes.getFullYear() + '-' + String(lunes.getMonth() + 1).padStart(2, '0') + '-' + String(lunes.getDate()).padStart(2, '0');
+    const etiqueta = 'Semana del ' + lunes.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+    return {
+      clave,
+      etiqueta,
+      orden: lunes.getTime()
+    };
+  }
+  // mes
+  const clave = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  const etiqueta = d.toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric'
+  });
+  return {
+    clave,
+    etiqueta,
+    orden: new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+  };
+}
+
+function agruparPorPeriodo(tipo) {
+  const buckets = {};
+  STATE.ventas.forEach(v => {
+    const {
+      clave,
+      etiqueta,
+      orden
+    } = claveYEtiquetaPeriodo(v.ts, tipo);
+    if (!buckets[clave]) buckets[clave] = {
+      etiqueta,
+      orden,
+      total: 0
+    };
+    buckets[clave].total += v.monto;
+  });
+  STATE.remis.forEach(m => {
+    const {
+      clave,
+      etiqueta,
+      orden
+    } = claveYEtiquetaPeriodo(m.ts, tipo);
+    if (!buckets[clave]) buckets[clave] = {
+      etiqueta,
+      orden,
+      total: 0
+    };
+    buckets[clave].total += (m.tipo === 'ingreso' ? m.monto : -m.monto);
+  });
+  return Object.values(buckets).sort((a, b) => b.orden - a.orden);
+}
+
+function renderHistorial() {
+  const wrap = document.getElementById('historial-lista');
+  if (!wrap) return;
+  const datos = agruparPorPeriodo(periodoHistorial).slice(0, 14);
+  if (datos.length === 0) {
+    wrap.innerHTML = '<div class="empty">Todavía no hay ventas registradas.</div>';
+    return;
+  }
+  const max = Math.max(...datos.map(d => Math.abs(d.total)), 1);
+  wrap.innerHTML = datos.map(d => {
+    const pct = Math.max(3, Math.round((Math.abs(d.total) / max) * 100));
+    const etiqueta = d.etiqueta.charAt(0).toUpperCase() + d.etiqueta.slice(1);
+    return `<div class="historial-row">
+      <div class="historial-top">
+        <span class="historial-label">${etiqueta}</span>
+        <span class="historial-monto">${fmtMoney(d.total)}</span>
+      </div>
+      <div class="historial-bar-track"><div class="historial-bar-fill" style="width:${pct}%;"></div></div>
+    </div>`;
+  }).join('');
 }
 
 /* ================= PREMIOS (catálogo) ================= */
@@ -1519,16 +1598,18 @@ function seleccionarPremioVenta(id) {
 
 /* ================= VENTA FLOW ================= */
 let envioSeleccionado; // undefined = todavía no se eligió | null = "Sin envío" elegido a propósito | 'cerca' | 'lejos'
-let carrito = []; // items del pedido actual: {prod, optKey, qty, label, monto}
-let destinoAgregar = 'venta'; // 'venta' | 'pedido' — a dónde van los productos que se eligen
+let carrito = []; // items que se van a vender ahora mismo (via "Vender ahora" o "Marcar listo")
 let pedidoItemsActual = []; // items del pedido de la libreta que se está armando
 let pedidoEnvioActual; // mismo criterio que envioSeleccionado
+let pedidoEditId = null; // si no es null, "guardar" actualiza este pedido en vez de crear uno nuevo
+let pedidoOrigenId = null; // si la venta que se está confirmando viene de un pedido pendiente, su id
+let pedidoClienteVentaAhora = ''; // nombre del cliente para el registro de "Completados hoy"
 
 function stockDisponiblePedido(prod) {
   const enCarrito = carrito.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
   const enPedidoActual = pedidoItemsActual.filter(i => i.prod === prod).reduce((s, i) => s + i.qty, 0);
   const enPedidosPendientes = STATE.pedidos
-    .filter(p => p.estado === 'pendiente')
+    .filter(p => p.estado === 'pendiente' && p.id !== pedidoEditId)
     .reduce((s, p) => s + (p.items || []).filter(i => i.prod === prod).reduce((s2, i) => s2 + i.qty, 0), 0);
   return (STATE.stock[prod] || 0) - enCarrito - enPedidoActual - enPedidosPendientes;
 }
@@ -1554,66 +1635,35 @@ function iniciarVenta(prod, optKey, customOpt) {
     showToast('Falta cargar el precio de ' + producto.label + ' en Precios');
     return;
   }
-  if (destinoAgregar === 'pedido') {
-    pedidoItemsActual.push({
-      prod,
-      optKey,
-      qty: opt.qty,
-      label: opt.label,
-      monto: precio
-    });
-    renderPedidoItems();
-    showToast('Agregado: ' + producto.label + ' - ' + opt.label);
-  } else {
-    carrito.push({
-      prod,
-      optKey,
-      qty: opt.qty,
-      label: opt.label,
-      monto: precio
-    });
-    renderCarrito();
-    showToast('Agregado al pedido: ' + producto.label + ' - ' + opt.label);
-  }
-}
-
-function renderCarrito() {
-  const card = document.getElementById('carrito-card');
-  const lista = document.getElementById('carrito-lista');
-  if (carrito.length === 0) {
-    card.style.display = 'none';
-    return;
-  }
-  card.style.display = 'block';
-  lista.innerHTML = carrito.map((item, idx) => `
-    <div class="prod-row">
-      <div class="prod-icon">${prodIconHtml(item.prod)}</div>
-      <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
-      <div class="stock-num">${fmtMoney(item.monto)}</div>
-      <button class="btn btn-sm btn-ghost" style="padding:6px 10px;" onclick="quitarDelCarrito(${idx})">✕</button>
-    </div>
-  `).join('');
-  const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
-  document.getElementById('carrito-subtotal').textContent = fmtMoney(subtotal);
-}
-
-function quitarDelCarrito(idx) {
-  carrito.splice(idx, 1);
-  renderCarrito();
-}
-
-function vaciarCarrito() {
-  carrito = [];
-  renderCarrito();
-  showToast('Pedido vaciado');
+  pedidoItemsActual.push({
+    prod,
+    optKey,
+    qty: opt.qty,
+    label: opt.label,
+    monto: precio
+  });
+  renderPedidoItems();
+  showToast('Agregado: ' + producto.label + ' - ' + opt.label);
 }
 
 /* ================= LIBRETA DE PEDIDOS ================= */
-function abrirPedidoForm() {
-  destinoAgregar = 'pedido';
-  pedidoItemsActual = [];
-  pedidoEnvioActual = undefined;
-  document.getElementById('ped-cliente').value = '';
+function abrirPedidoForm(editId) {
+  pedidoEditId = editId || null;
+  document.getElementById('pedido-form-title').textContent = editId ? 'Editar pedido' : 'Nuevo pedido';
+  document.getElementById('ped-guardar-btn').textContent = editId ? 'Guardar cambios' : 'Guardar en la fila';
+
+  if (editId) {
+    const pedido = STATE.pedidos.find(p => p.id === editId);
+    if (!pedido) return;
+    document.getElementById('ped-cliente').value = pedido.cliente || '';
+    pedidoItemsActual = (pedido.items || []).map(i => ({ ...i
+    }));
+    pedidoEnvioActual = pedido.envio;
+  } else {
+    document.getElementById('ped-cliente').value = '';
+    pedidoItemsActual = [];
+    pedidoEnvioActual = undefined;
+  }
   renderPedidoItems();
   renderPedidoEnvioOpts();
   mostrarOverlay('overlay-pedido-form');
@@ -1671,39 +1721,69 @@ function seleccionarEnvioPedido(key) {
   renderPedidoEnvioOpts();
 }
 
-async function guardarPedido() {
-  const cliente = document.getElementById('ped-cliente').value.trim();
-  if (!cliente) {
-    showToast('Poné el nombre o el teléfono de quién pidió');
-    return;
-  }
+function validarPedidoForm() {
   if (pedidoItemsActual.length === 0) {
     showToast('Agregá al menos un producto al pedido');
-    return;
+    return false;
   }
   if (typeof pedidoEnvioActual === 'undefined') {
-    showToast('Elegí una opción de envío (o "Sin envío") antes de guardar');
-    return;
+    showToast('Elegí una opción de envío (o "Sin envío") antes de continuar');
+    return false;
   }
+  return true;
+}
+
+async function guardarPedido() {
+  if (!validarPedidoForm()) return;
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
   }
+  const cliente = document.getElementById('ped-cliente').value.trim() || 'Sin nombre';
   try {
-    await db.collection('doldichipa_pedidos').add({
-      cliente,
-      items: pedidoItemsActual,
-      envio: pedidoEnvioActual,
-      estado: 'pendiente',
-      creadoTs: Date.now()
-    });
+    if (pedidoEditId) {
+      await db.collection('doldichipa_pedidos').doc(pedidoEditId).update({
+        cliente,
+        items: pedidoItemsActual,
+        envio: pedidoEnvioActual
+      });
+      showToast('Pedido actualizado');
+    } else {
+      await db.collection('doldichipa_pedidos').add({
+        cliente,
+        items: pedidoItemsActual,
+        envio: pedidoEnvioActual,
+        estado: 'pendiente',
+        creadoTs: Date.now()
+      });
+      showToast('Pedido guardado');
+    }
     cerrarModal('overlay-pedido-form');
-    showToast('Pedido guardado');
     pedidoItemsActual = [];
     pedidoEnvioActual = undefined;
+    pedidoEditId = null;
   } catch (e) {
     showToast('No se pudo guardar el pedido');
   }
+}
+
+// Vender un pedido ahora mismo: reusa la misma pantalla de checkout que ya
+// tiene fecha/hora, cliente con puntos y premios — solo cambia de dónde
+// vienen los ítems.
+function venderAhora() {
+  if (!validarPedidoForm()) return;
+  const cliente = document.getElementById('ped-cliente').value.trim() || 'Sin nombre';
+  carrito = pedidoItemsActual.map(i => ({ ...i
+  }));
+  pedidoOrigenId = pedidoEditId; // si estaba editando un pedido en espera, se termina ese mismo
+  pedidoClienteVentaAhora = cliente;
+  const envioElegido = pedidoEnvioActual;
+  pedidoItemsActual = [];
+  pedidoEnvioActual = undefined;
+  pedidoEditId = null;
+  cerrarModal('overlay-pedido-form');
+  abrirFinalizarPedido();
+  seleccionarEnvio(envioElegido);
 }
 
 function resumenItemsPedido(items) {
@@ -1729,7 +1809,8 @@ function renderPedidos() {
           <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
         </div>
         <div class="pi-actions" style="flex-direction:column; align-items:stretch;">
-          <button class="btn btn-sm btn-green" onclick="confirmarPedidoListo('${p.id}')">Marcar listo</button>
+          <button class="btn btn-sm btn-green" onclick="marcarListoDesdePedido('${p.id}')">Marcar listo</button>
+          <button class="btn btn-sm btn-ghost" onclick="abrirPedidoForm('${p.id}')">Editar</button>
           <button class="btn btn-sm btn-ghost" onclick="eliminarPedidoUI('${p.id}')">Eliminar</button>
         </div>
       </div>`;
@@ -1753,63 +1834,18 @@ function renderPedidos() {
   }
 }
 
-async function confirmarPedidoListo(id) {
+// Marcar un pedido en espera como "listo" ahora pasa por la misma pantalla
+// de checkout que "Vender ahora" (para poder elegir fecha, cliente/puntos, etc.)
+function marcarListoDesdePedido(id) {
   const pedido = STATE.pedidos.find(p => p.id === id);
   if (!pedido) return;
-  if (!db) {
-    showToast('No está conectado a la nube (menú → Configuración)');
-    return;
-  }
-
-  const items = pedido.items || [];
-  items.forEach(item => {
-    STATE.stock[item.prod] = Math.max(0, (STATE.stock[item.prod] || 0) - item.qty);
-  });
-
-  const envioMonto = pedido.envio ? ((STATE.precios.envio && STATE.precios.envio[pedido.envio]) || 0) : 0;
-  const ventaPromises = items.map((item, i) => {
-    const esUltimo = i === items.length - 1;
-    return addVenta({
-      ts: Date.now(),
-      prod: item.prod,
-      optKey: item.optKey,
-      qty: item.qty,
-      qtyLabel: item.label,
-      monto: item.monto + (esUltimo ? envioMonto : 0),
-      envio: esUltimo ? pedido.envio : null
-    });
-  });
-
-  const totalPedido = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
-  STATE.caja.total = (STATE.caja.total || 0) + totalPedido;
-
-  const resultados = await Promise.all([
-    saveStock(),
-    saveCaja(),
-    ...ventaPromises,
-    db.collection('doldichipa_pedidos').doc(id).update({
-      estado: 'listo',
-      listoTs: Date.now()
-    }).then(() => true).catch(() => false)
-  ]);
-
-  if (resultados.every(Boolean)) {
-    const siguiente = STATE.pedidos
-      .filter(p => p.estado === 'pendiente' && p.id !== id)
-      .sort((a, b) => a.creadoTs - b.creadoTs)[0];
-    let msg = 'Pedido de ' + pedido.cliente + ' listo';
-    msg += siguiente ?
-      (' — Sigue: ' + siguiente.cliente + ' (' + resumenItemsPedido(siguiente.items) + ')') :
-      ' — No quedan más pedidos en espera';
-    showToast(msg);
-  } else {
-    showToast('Hubo un problema al marcar el pedido como listo. Probá de nuevo.');
-  }
-  renderPedidos();
-  renderStock();
-  renderVender();
-  renderVentas();
-  renderCaja();
+  carrito = (pedido.items || []).map(i => ({ ...i
+  }));
+  pedidoOrigenId = id;
+  pedidoClienteVentaAhora = pedido.cliente;
+  const envioDelPedido = (typeof pedido.envio === 'undefined') ? null : pedido.envio;
+  abrirFinalizarPedido();
+  seleccionarEnvio(envioDelPedido);
 }
 
 function eliminarPedidoUI(id) {
@@ -2012,16 +2048,39 @@ async function confirmarVenta() {
     const total = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
     cerrarModal('overlay-confirm');
     showToast('Pedido registrado · ' + fmtMoney(total) + (premioSeleccionadoVenta ? ' · Premio aplicado: ' + premioSeleccionadoVenta.nombre : ''));
+
+    // Dejar rastro en la libreta de pedidos (para "Completados hoy"): si esta
+    // venta venía de un pedido en espera, se marca ese mismo como listo; si
+    // fue una venta directa ("Vender ahora"), se crea un registro nuevo.
+    const registroPedido = {
+      cliente: pedidoClienteVentaAhora || 'Sin nombre',
+      items,
+      envio: envioSeleccionado,
+      estado: 'listo',
+      listoTs: tsElegido
+    };
+    if (db) {
+      if (pedidoOrigenId) {
+        db.collection('doldichipa_pedidos').doc(pedidoOrigenId).update(registroPedido).catch(() => {});
+      } else {
+        db.collection('doldichipa_pedidos').add({
+          ...registroPedido,
+          creadoTs: tsElegido
+        }).catch(() => {});
+      }
+    }
+    pedidoOrigenId = null;
+    pedidoClienteVentaAhora = '';
+
     carrito = [];
     envioSeleccionado = undefined;
     clienteVentaActual = null;
     premioSeleccionadoVenta = null;
-    renderCarrito();
   }
-  renderVender();
   renderStock();
   renderVentas();
   renderCaja();
+  renderPedidos();
 }
 
 /* ================= CARGA FLOW ================= */
@@ -2150,180 +2209,7 @@ async function confirmarReinicio() {
   }
 }
 
-/* ================= SCANNER ================= */
-let audioCtx = null;
-
-function abrirScanner(modeArg) {
-  scannerMode = modeArg || 'venta';
-  document.getElementById('scanner-title').textContent = 'Escanear bolsita de venta';
-  document.getElementById('scan-status').textContent = 'Buscando código...';
-  mostrarOverlay('overlay-scanner');
-
-  // El sonido de "bip" solo se puede desbloquear durante un toque real del
-  // usuario (esto, que es un onclick de botón, cuenta). Si lo creamos recién
-  // cuando se detecta el QR (que no es un toque directo), el navegador lo
-  // bloquea y no suena. Por eso se prepara acá y se reusa después.
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!audioCtx) audioCtx = new AudioCtx();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  } catch (e) {}
-
-  startCamera();
-}
-
-function cerrarScanner() {
-  document.getElementById('overlay-scanner').classList.remove('show');
-  stopCamera();
-}
-async function startCamera() {
-  stopCamera();
-  const video = document.getElementById('scanner-video');
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    document.getElementById('scan-status').textContent = 'Este navegador no permite acceso a la cámara acá. Probá con Chrome actualizado.';
-    return;
-  }
-
-  try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: {
-          ideal: 'environment'
-        },
-        width: {
-          ideal: 1280
-        },
-        height: {
-          ideal: 720
-        }
-      }
-    });
-  } catch (e1) {
-    // Reintentar sin pedir específicamente la cámara trasera
-    try {
-      scannerStream = await navigator.mediaDevices.getUserMedia({
-        video: true
-      });
-    } catch (e2) {
-      let motivo = e2.name || 'desconocido';
-      let msg = 'No se pudo acceder a la cámara (' + motivo + ').';
-      if (motivo === 'NotAllowedError') msg = 'El navegador bloqueó la cámara. Revisá los permisos y volvé a intentar.';
-      else if (motivo === 'NotReadableError') msg = 'La cámara está siendo usada por otra app. Cerrá otras apps que la usen (video llamadas, otra pestaña) y volvé a intentar.';
-      else if (motivo === 'NotFoundError') msg = 'No se encontró ninguna cámara en este dispositivo.';
-      document.getElementById('scan-status').textContent = msg + ' Podés usar la selección manual en la pantalla.';
-      return;
-    }
-  }
-
-  video.srcObject = scannerStream;
-  try {
-    await video.play();
-  } catch (e3) {
-    // Algunos navegadores rechazan play() aunque el video ya esté mostrando imagen
-    // (por ejemplo, con muted+playsinline suele arrancar solo). No cortamos acá:
-    // seguimos e intentamos escanear igual.
-  }
-  scanLoop();
-}
-
-function stopCamera() {
-  if (scannerLoopId) cancelAnimationFrame(scannerLoopId);
-  scannerLoopId = null;
-  if (scannerStream) {
-    scannerStream.getTracks().forEach(t => t.stop());
-    scannerStream = null;
-  }
-}
-
-function scanLoop() {
-  try {
-    const video = document.getElementById('scanner-video');
-    const canvas = document.getElementById('scanner-canvas');
-    if (typeof jsQR !== 'function') {
-      document.getElementById('scan-status').textContent = 'Error: no se pudo cargar el lector de QR (sin conexión a internet?). Revisá tu wifi/datos y volvé a entrar.';
-      return;
-    }
-    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-      const MAX_DIM = 720;
-      const scale = Math.min(1, MAX_DIM / Math.max(video.videoWidth, video.videoHeight));
-      canvas.width = Math.round(video.videoWidth * scale);
-      canvas.height = Math.round(video.videoHeight * scale);
-      const ctx = canvas.getContext('2d', {
-        willReadFrequently: true
-      });
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(img.data, img.width, img.height, {
-        inversionAttempts: 'attemptBoth'
-      });
-      if (code && code.data) {
-        handleScanResult(code.data);
-        return;
-      }
-    }
-    scannerLoopId = requestAnimationFrame(scanLoop);
-  } catch (errScan) {
-    document.getElementById('scan-status').textContent = 'Error al escanear: ' + (errScan.message || errScan);
-  }
-}
-
-/* ================= SONIDO DE ESCANEO ================= */
-function reproducirBip() {
-  try {
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 1000;
-    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-  } catch (e) {
-    // Si el navegador no permite sonido acá, no pasa nada grave, seguimos igual.
-  }
-}
-
-function handleScanResult(text) {
-  try {
-    const parts = text.trim().split(':');
-    if (parts[0] !== 'DOLDI') {
-      document.getElementById('scan-status').textContent = 'Código no reconocido, seguí intentando...';
-      scannerLoopId = requestAnimationFrame(scanLoop);
-      return;
-    }
-    const tipo = parts[1]; // VENTA | CARGA
-    const prod = (parts[2] || '').toLowerCase();
-    const p = STATE.productos[prod];
-    if (!p) {
-      document.getElementById('scan-status').textContent = 'Código no reconocido.';
-      scannerLoopId = requestAnimationFrame(scanLoop);
-      return;
-    }
-    reproducirBip();
-    cerrarScanner();
-    if (tipo === 'VENTA') {
-      destinoAgregar = 'venta';
-      abrirSelectorCantidad(prod);
-    } else if (tipo === 'CARGA') {
-      const cant = Number(parts[3]) || p.packSize || 1;
-      STATE.stock[prod] = (STATE.stock[prod] || 0) + cant;
-      saveStock();
-      showToast(p.label + ': stock actualizado');
-      renderStock();
-      renderVender();
-    }
-  } catch (errHandle) {
-    showToast('Error al procesar el QR: ' + (errHandle.message || errHandle));
-  }
-}
-
-function abrirElegirProducto(destino) {
-  destinoAgregar = destino || 'venta';
+function abrirElegirProducto() {
   const wrap = document.getElementById('elegir-producto-lista');
   const ids = productosOrdenados();
   if (ids.length === 0) {
