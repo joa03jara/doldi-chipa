@@ -1656,17 +1656,26 @@ function abrirPedidoForm(editId) {
     const pedido = STATE.pedidos.find(p => p.id === editId);
     if (!pedido) return;
     document.getElementById('ped-cliente').value = pedido.cliente || '';
+    document.getElementById('ped-direccion').value = pedido.direccion || '';
     pedidoItemsActual = (pedido.items || []).map(i => ({ ...i
     }));
     pedidoEnvioActual = pedido.envio;
   } else {
     document.getElementById('ped-cliente').value = '';
+    document.getElementById('ped-direccion').value = '';
     pedidoItemsActual = [];
     pedidoEnvioActual = undefined;
   }
   renderPedidoItems();
   renderPedidoEnvioOpts();
+  actualizarVisibilidadDireccion();
   mostrarOverlay('overlay-pedido-form');
+}
+
+// La ubicación solo tiene sentido si el pedido lleva envío.
+function actualizarVisibilidadDireccion() {
+  const conEnvio = !!pedidoEnvioActual;
+  document.getElementById('ped-direccion-wrap').style.display = conEnvio ? 'block' : 'none';
 }
 
 function renderPedidoItems() {
@@ -1719,6 +1728,7 @@ function seleccionarEnvioPedido(key) {
   pedidoEnvioActual = key;
   renderPedidoEnvioOpts();
   actualizarTotalPedidoForm();
+  actualizarVisibilidadDireccion();
 }
 
 // El envío elegido tiene que reflejarse al toque en el total mostrado en el
@@ -1748,12 +1758,14 @@ async function guardarPedido() {
     return;
   }
   const cliente = document.getElementById('ped-cliente').value.trim() || 'Sin nombre';
+  const direccion = document.getElementById('ped-direccion').value.trim();
   try {
     if (pedidoEditId) {
       await db.collection('doldichipa_pedidos').doc(pedidoEditId).update({
         cliente,
         items: pedidoItemsActual,
-        envio: pedidoEnvioActual
+        envio: pedidoEnvioActual,
+        direccion
       });
       showToast('Pedido actualizado');
     } else {
@@ -1761,6 +1773,7 @@ async function guardarPedido() {
         cliente,
         items: pedidoItemsActual,
         envio: pedidoEnvioActual,
+        direccion,
         estado: 'pendiente',
         creadoTs: Date.now()
       });
@@ -1782,6 +1795,13 @@ function resumenItemsPedido(items) {
   return (items || []).map(i => i.label + ' de ' + (STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod)).join(', ');
 }
 
+function ubicacionHref(direccion) {
+  if (!direccion) return null;
+  const txt = direccion.trim();
+  if (!txt) return null;
+  return /^https?:\/\//i.test(txt) ? txt : ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(txt));
+}
+
 function renderPedidos() {
   const pendientes = STATE.pedidos.filter(p => p.estado === 'pendiente').sort((a, b) => a.creadoTs - b.creadoTs);
   const wrap = document.getElementById('pedidos-lista');
@@ -1791,6 +1811,7 @@ function renderPedidos() {
     wrap.innerHTML = pendientes.map((p, idx) => {
       const subtotal = (p.items || []).reduce((s, i) => s + i.monto, 0) + (p.envio ? ((STATE.precios.envio && STATE.precios.envio[p.envio]) || 0) : 0);
       const esPrimero = idx === 0;
+      const href = ubicacionHref(p.direccion);
       return `<div class="product-item" style="align-items:flex-start; ${esPrimero?'background:var(--orange-soft); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; border-bottom:none;':'padding-bottom:14px;'}">
         <div style="flex:1;">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -1799,6 +1820,7 @@ function renderPedidos() {
           </div>
           <div class="unit-tag" style="white-space:normal;">${resumenItemsPedido(p.items)}${p.envio ? ' + envío ' + p.envio : ''}</div>
           <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
+          ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; text-decoration:none;">📍 Ver ubicación</a>` : ''}
         </div>
         <div class="pi-actions" style="flex-direction:column; align-items:stretch;">
           <button class="btn btn-sm btn-green" onclick="marcarListoDesdePedido('${p.id}')">Marcar listo</button>
