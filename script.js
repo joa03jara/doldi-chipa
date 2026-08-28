@@ -1683,8 +1683,6 @@ function renderPedidoItems() {
       </div>
     `).join('');
   }
-  const subtotal = pedidoItemsActual.reduce((s, i) => s + i.monto, 0);
-  document.getElementById('ped-subtotal').textContent = fmtMoney(subtotal);
   actualizarTotalPedidoForm();
 }
 
@@ -1837,9 +1835,9 @@ function marcarListoDesdePedido(id) {
   }));
   pedidoOrigenId = id;
   pedidoClienteVentaAhora = pedido.cliente;
-  const envioDelPedido = (typeof pedido.envio === 'undefined') ? null : pedido.envio;
+  // El envío ya se eligió cuando se anotó el pedido — acá no se vuelve a pedir.
+  envioSeleccionado = (typeof pedido.envio === 'undefined') ? null : pedido.envio;
   abrirFinalizarPedido();
-  seleccionarEnvio(envioDelPedido);
 }
 
 function eliminarPedidoUI(id) {
@@ -1873,55 +1871,35 @@ function abrirFinalizarPedido() {
   if (carrito.length === 0) return;
   const body = document.getElementById('confirm-body');
   const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
+  const envioMonto = envioSeleccionado ? ((STATE.precios.envio && STATE.precios.envio[envioSeleccionado]) || 0) : 0;
+  const total = subtotal + envioMonto;
+  const envioLabelMap = {
+    cerca: 'Envío cerca',
+    lejos: 'Envío lejos'
+  };
   body.innerHTML = carrito.map(item => `
     <div class="prod-row">
       <div class="prod-icon">${prodIconHtml(item.prod)}</div>
       <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
       <div class="stock-num">${fmtMoney(item.monto)}</div>
     </div>
-  `).join('') + `
+  `).join('') + (envioMonto ? `
+    <div class="prod-row">
+      <div class="prod-name" style="flex:1;">${envioLabelMap[envioSeleccionado] || 'Envío'}</div>
+      <div class="stock-num">${fmtMoney(envioMonto)}</div>
+    </div>
+  ` : '') + `
     <div class="prod-row" style="border-top:1.5px solid var(--border); padding-top:10px;">
-      <div class="prod-name" style="flex:1;">Subtotal</div>
-      <div class="stock-num">${fmtMoney(subtotal)}</div>
+      <div class="prod-name" style="flex:1; font-weight:800;">Total</div>
+      <div class="stock-num" style="color:var(--orange-dark);">${fmtMoney(total)}</div>
     </div>
   `;
-  envioSeleccionado = undefined;
   clienteVentaActual = null;
   premioSeleccionadoVenta = null;
   document.getElementById('venta-cliente-dni').value = '';
   document.getElementById('venta-cliente-resultado').innerHTML = '';
   document.getElementById('venta-fecha-hora').value = toDatetimeLocalValue(new Date());
-  renderEnvioOpts();
   mostrarOverlay('overlay-confirm');
-}
-
-function renderEnvioOpts() {
-  const wrap = document.getElementById('confirm-envio-opts');
-  const opts = [{
-      key: null,
-      label: 'Sin envío',
-      precio: 0
-    },
-    {
-      key: 'cerca',
-      label: 'Envío cerca',
-      precio: STATE.precios.envio.cerca || 0
-    },
-    {
-      key: 'lejos',
-      label: 'Envío lejos',
-      precio: STATE.precios.envio.lejos || 0
-    },
-  ];
-  wrap.innerHTML = opts.map(o => {
-    const active = envioSeleccionado === o.key;
-    return `<div class="qty-btn" style="${active?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="seleccionarEnvio(${o.key?`'${o.key}'`:'null'})">${o.label}${o.precio? `<span class="p">${fmtMoney(o.precio)}</span>`:''}</div>`;
-  }).join('');
-}
-
-function seleccionarEnvio(key) {
-  envioSeleccionado = key;
-  renderEnvioOpts();
 }
 
 function aplicarDescuentoAItems(items, descuentoTotal) {
