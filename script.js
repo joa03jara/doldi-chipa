@@ -1845,6 +1845,49 @@ function ubicacionEmbedSrc(direccion) {
   return 'https://maps.google.com/maps?q=' + encodeURIComponent(query) + '&z=15&output=embed';
 }
 
+// Si en el campo "Cliente" hay un número de teléfono, lo separa para poder
+// armar el link directo de WhatsApp (wa.me). Si no hay, devuelve null y se
+// usa "Copiar mensaje" como alternativa (para pedidos de Instagram/Facebook).
+function telefonoDesdeCliente(cliente) {
+  if (!cliente) return null;
+  const digitos = cliente.replace(/\D/g, '');
+  return digitos.length >= 8 ? digitos : null;
+}
+
+// Nombre para el saludo: lo que esté escrito antes de la barra o los números
+// (ej: "María / 11-2345-6789" -> "María"). Si no hay nada usable, saluda genérico.
+function nombreDesdeCliente(cliente) {
+  if (!cliente) return null;
+  const nombre = cliente.split('/')[0].replace(/[0-9]/g, '').trim();
+  return (nombre && nombre.toLowerCase() !== 'sin nombre') ? nombre : null;
+}
+
+function mensajePedidoListo(p) {
+  const nombre = nombreDesdeCliente(p.cliente);
+  const saludo = nombre ? ('¡Holaa ' + nombre + '!') : '¡Holaa!';
+  const subtotal = (p.items || []).reduce((s, i) => s + i.monto, 0) + (p.envio ? ((STATE.precios.envio && STATE.precios.envio[p.envio]) || 0) : 0);
+  const entrega = p.envio ? 'Ya te preparamos tu pedido y en breve sale para tu casa 🛵' : 'Ya te preparamos tu pedido, ¡te esperamos para que lo retires!';
+  return `${saludo} ${entrega} ${resumenItemsPedido(p.items)}. Total: ${fmtMoney(subtotal)}. ¡Cualquier cosa avisanos!`;
+}
+
+function avisarPedidoListo(id) {
+  const pedido = STATE.pedidos.find(p => p.id === id);
+  if (!pedido) return;
+  const mensaje = mensajePedidoListo(pedido);
+  const tel = telefonoDesdeCliente(pedido.cliente);
+  if (tel) {
+    window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(mensaje), '_blank');
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(mensaje).then(() => {
+      showToast('Mensaje copiado — pegalo en Instagram o Facebook');
+    }).catch(() => {
+      showToast('No se pudo copiar el mensaje');
+    });
+  } else {
+    showToast('No se pudo copiar el mensaje');
+  }
+}
+
 function renderPedidos() {
   const pendientes = STATE.pedidos.filter(p => p.estado === 'pendiente').sort((a, b) => a.creadoTs - b.creadoTs);
   const wrap = document.getElementById('pedidos-lista');
@@ -1856,6 +1899,7 @@ function renderPedidos() {
       const esPrimero = idx === 0;
       const href = ubicacionHref(p.direccion);
       const embedSrc = ubicacionEmbedSrc(p.direccion);
+      const tieneTelefono = !!telefonoDesdeCliente(p.cliente);
       return `<div class="pedido-card ${esPrimero?'primero':''}">
         <div class="pedido-card-top">
           <div class="pedido-card-info">
@@ -1871,6 +1915,7 @@ function renderPedidos() {
         ${embedSrc ? `<iframe class="pedido-card-mapa" src="${embedSrc}" height="150" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : ''}
         ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold btn-block" style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:10px; text-decoration:none;">📍 Cómo llegar</a>` : ''}
         <div class="pedido-card-footer">
+          <a href="javascript:void(0)" onclick="avisarPedidoListo('${p.id}')">${tieneTelefono ? 'Avisar por WhatsApp' : 'Copiar mensaje'}</a>
           <a href="javascript:void(0)" onclick="abrirPedidoForm('${p.id}')">Editar</a>
           <a href="javascript:void(0)" onclick="eliminarPedidoUI('${p.id}')">Eliminar</a>
         </div>
