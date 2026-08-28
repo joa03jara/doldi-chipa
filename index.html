@@ -593,7 +593,8 @@
       <h3 id="pedido-form-title">Nuevo pedido</h3>
       <div class="form-field">
         <label>Cliente (opcional — nombre o teléfono)</label>
-        <input type="text" id="ped-cliente" placeholder="Ej: María / 11-2345-6789">
+        <input type="text" id="ped-cliente" list="clientes-datalist" placeholder="Ej: María / 11-2345-6789">
+        <datalist id="clientes-datalist"></datalist>
       </div>
       <button class="btn btn-ghost btn-block" onclick="abrirElegirProducto('pedido')">+ Agregar producto</button>
       <div id="ped-items-lista" style="margin-top:10px;"></div>
