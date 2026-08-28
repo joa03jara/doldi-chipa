@@ -1091,3 +1091,45 @@ main {
   background: linear-gradient(90deg, var(--orange), var(--orange-dark));
   border-radius: 6px 0 0 6px;
 }
+
+/* ================= TARJETA DE PEDIDO EN ESPERA ================= */
+.pedido-card {
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 10px;
+  border-bottom: none !important;
+}
+.pedido-card:last-child { margin-bottom: 0; }
+.pedido-card.primero { background: var(--orange-soft); }
+.pedido-card:not(.primero) { border-bottom: 1px solid var(--border) !important; border-radius: 0; padding: 14px 0; }
+.pedido-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pedido-card-info { flex: 1; min-width: 0; }
+.pedido-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.pedido-card-mapa {
+  border: 0;
+  border-radius: 10px;
+  margin-top: 12px;
+  display: block;
+  width: 100%;
+}
+.pedido-card-footer {
+  display: flex;
+  gap: 18px;
+  margin-top: 12px;
+}
+.pedido-card-footer a {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--orange-dark);
+  text-decoration: none;
+}

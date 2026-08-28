@@ -462,22 +462,21 @@
     <div class="sheet sheet-wrap">
       <button class="close" onclick="cerrarModal('overlay-confirm')">✕</button>
       <h3>Confirmar pedido</h3>
-      <div id="confirm-body" style="margin:10px 0;"></div>
 
-      <p class="muted" style="margin:14px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Cliente (opcional, para sumar o canjear puntos)</p>
+      <p class="muted" style="margin:6px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Cliente (opcional, para sumar o canjear puntos)</p>
       <div class="row-input">
         <label>DNI</label>
         <input type="text" inputmode="numeric" id="venta-cliente-dni" placeholder="Ej: 30123456" oninput="onInputClienteVenta()" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
       </div>
       <div id="venta-cliente-resultado" style="margin-top:10px;"></div>
 
-      <p class="muted" style="margin:14px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Fecha y hora de la venta</p>
-      <div class="form-field" style="margin-bottom:14px;">
+      <a href="javascript:void(0)" id="venta-fecha-toggle" onclick="mostrarFechaVenta()" style="display:block; margin-top:16px; font-size:12.5px; color:var(--muted); text-decoration:underline;">¿Es de otro día? Tocá acá para cambiar la fecha</a>
+      <div class="form-field" id="venta-fecha-wrap" style="margin-top:10px; margin-bottom:14px; display:none;">
+        <label>Fecha y hora de la venta</label>
         <input type="datetime-local" id="venta-fecha-hora" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
-        <p class="muted" style="margin:6px 0 0; font-size:12px;">Por defecto es ahora. Cambiala si estás cargando una venta de otro momento (ej: de ayer).</p>
       </div>
 
-      <button class="btn btn-green btn-block" onclick="confirmarVenta()">Confirmar pedido</button>
+      <button class="btn btn-green btn-block" style="margin-top:10px;" onclick="confirmarVenta()">Confirmar pedido</button>
     </div>
   </div>
 

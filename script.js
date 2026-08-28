@@ -1825,21 +1825,23 @@ function renderPedidos() {
       const esPrimero = idx === 0;
       const href = ubicacionHref(p.direccion);
       const embedSrc = ubicacionEmbedSrc(p.direccion);
-      return `<div class="product-item" style="align-items:flex-start; ${esPrimero?'background:var(--orange-soft); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; border-bottom:none;':'padding-bottom:14px;'}">
-        <div style="flex:1;">
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-            ${esPrimero ? '<span style="background:var(--orange); color:#2a1a08; font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px;">SIGUE ESTE</span>' : `<span class="muted" style="font-size:12px; font-weight:700;">#${idx+1}</span>`}
-            <div class="prod-name">${p.cliente}</div>
+      return `<div class="pedido-card ${esPrimero?'primero':''}">
+        <div class="pedido-card-top">
+          <div class="pedido-card-info">
+            <div class="pedido-card-badges">
+              ${esPrimero ? '<span style="background:var(--orange); color:#2a1a08; font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px;">SIGUE ESTE</span>' : `<span class="muted" style="font-size:12px; font-weight:700;">#${idx+1}</span>`}
+              <div class="prod-name">${p.cliente}</div>
+            </div>
+            <div class="unit-tag" style="white-space:normal;">${resumenItemsPedido(p.items)}${p.envio ? ' + envío ' + p.envio : ''}</div>
+            <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
           </div>
-          <div class="unit-tag" style="white-space:normal;">${resumenItemsPedido(p.items)}${p.envio ? ' + envío ' + p.envio : ''}</div>
-          <div class="stock-num" style="margin-top:6px; font-size:16px;">${fmtMoney(subtotal)}</div>
-          ${embedSrc ? `<iframe src="${embedSrc}" width="100%" height="150" style="border:0; border-radius:10px; margin-top:8px; display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : ''}
-          ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; text-decoration:none;">📍 Cómo llegar</a>` : ''}
+          <button class="btn btn-sm btn-green" style="flex-shrink:0;" onclick="marcarListoDesdePedido('${p.id}')">Marcar listo</button>
         </div>
-        <div class="pi-actions" style="flex-direction:column; align-items:stretch;">
-          <button class="btn btn-sm btn-green" onclick="marcarListoDesdePedido('${p.id}')">Marcar listo</button>
-          <button class="btn btn-sm btn-ghost" onclick="abrirPedidoForm('${p.id}')">Editar</button>
-          <button class="btn btn-sm btn-ghost" onclick="eliminarPedidoUI('${p.id}')">Eliminar</button>
+        ${embedSrc ? `<iframe class="pedido-card-mapa" src="${embedSrc}" height="150" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : ''}
+        ${href ? `<a href="${href}" target="_blank" rel="noopener" class="btn btn-sm btn-gold btn-block" style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:10px; text-decoration:none;">📍 Cómo llegar</a>` : ''}
+        <div class="pedido-card-footer">
+          <a href="javascript:void(0)" onclick="abrirPedidoForm('${p.id}')">Editar</a>
+          <a href="javascript:void(0)" onclick="eliminarPedidoUI('${p.id}')">Eliminar</a>
         </div>
       </div>`;
     }).join('');
@@ -1905,37 +1907,21 @@ function toDatetimeLocalValue(d) {
 
 function abrirFinalizarPedido() {
   if (carrito.length === 0) return;
-  const body = document.getElementById('confirm-body');
-  const subtotal = carrito.reduce((s, i) => s + i.monto, 0);
-  const envioMonto = envioSeleccionado ? ((STATE.precios.envio && STATE.precios.envio[envioSeleccionado]) || 0) : 0;
-  const total = subtotal + envioMonto;
-  const envioLabelMap = {
-    cerca: 'Envío cerca',
-    lejos: 'Envío lejos'
-  };
-  body.innerHTML = carrito.map(item => `
-    <div class="prod-row">
-      <div class="prod-icon">${prodIconHtml(item.prod)}</div>
-      <div style="flex:1;"><div class="prod-name">${STATE.productos[item.prod]?STATE.productos[item.prod].label:item.prod}</div><div class="unit-tag">${item.label}</div></div>
-      <div class="stock-num">${fmtMoney(item.monto)}</div>
-    </div>
-  `).join('') + (envioMonto ? `
-    <div class="prod-row">
-      <div class="prod-name" style="flex:1;">${envioLabelMap[envioSeleccionado] || 'Envío'}</div>
-      <div class="stock-num">${fmtMoney(envioMonto)}</div>
-    </div>
-  ` : '') + `
-    <div class="prod-row" style="border-top:1.5px solid var(--border); padding-top:10px;">
-      <div class="prod-name" style="flex:1; font-weight:800;">Total</div>
-      <div class="stock-num" style="color:var(--orange-dark);">${fmtMoney(total)}</div>
-    </div>
-  `;
   clienteVentaActual = null;
   premioSeleccionadoVenta = null;
   document.getElementById('venta-cliente-dni').value = '';
   document.getElementById('venta-cliente-resultado').innerHTML = '';
   document.getElementById('venta-fecha-hora').value = toDatetimeLocalValue(new Date());
+  document.getElementById('venta-fecha-wrap').style.display = 'none';
+  document.getElementById('venta-fecha-toggle').style.display = 'block';
   mostrarOverlay('overlay-confirm');
+}
+
+// La fecha está escondida por defecto (casi siempre es "ahora"); este link
+// la muestra solo si de verdad hace falta cargar una venta de otro día.
+function mostrarFechaVenta() {
+  document.getElementById('venta-fecha-wrap').style.display = 'block';
+  document.getElementById('venta-fecha-toggle').style.display = 'none';
 }
 
 function aplicarDescuentoAItems(items, descuentoTotal) {
