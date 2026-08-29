@@ -322,6 +322,17 @@
         <p class="muted" id="config-status-desc" style="margin-top:-4px;">Sin conectar, los datos NO se comparten entre celulares y se pierden al cerrar.</p>
       </div>
       <div class="card">
+        <h2>¿Quién sos?</h2>
+        <p class="muted" style="margin-top:-4px;">Se usa para avisarle al otro cuando armás un pedido nuevo. Se configura una sola vez por celular.</p>
+        <div class="grid2" id="quien-soy-opts" style="margin-top:10px;"></div>
+      </div>
+      <div class="card">
+        <h2>Notificaciones (OneSignal)</h2>
+        <p class="muted" style="margin-top:-4px;">Pegá acá la <b>REST API Key</b> de tu cuenta de OneSignal (Ajustes → Claves API). Se guarda solo en este celular, no se sube a GitHub.</p>
+        <input type="text" id="onesignal-key-input" placeholder="Pegá la REST API Key" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:var(--bg); color:var(--text); margin-top:8px;">
+        <button class="btn btn-gold btn-block" style="margin-top:10px;" onclick="guardarOneSignalKey()">Guardar clave</button>
+      </div>
+      <div class="card">
         <h2>1. Creá tu base de datos gratis</h2>
         <p class="muted">En <b>firebase.google.com</b> → creá un proyecto gratis → activá <b>Firestore Database</b> (modo prueba) → registrá una "app web" → copiá el bloque <code>firebaseConfig</code> que te muestra.</p>
       </div>
@@ -674,6 +685,17 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- OneSignal (avisos de pedido nuevo entre celulares) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: "388fca65-069d-41e4-a5bf-126e256dc778" });
+      window.__oneSignalListo = true;
+      if (typeof aplicarQuienSoyGuardado === 'function') aplicarQuienSoyGuardado();
+    });
+  </script>
 
   <script src="script.js"></script>
 </body>

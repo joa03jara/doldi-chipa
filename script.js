@@ -278,6 +278,84 @@ function conectarFirebase() {
   irATab('stock');
 }
 
+/* ================= NOTIFICACIONES ENTRE CELULARES (OneSignal) ================= */
+const PERSONAS = ['Joaquín', 'Belén'];
+
+function otraPersona(nombre) {
+  return PERSONAS.find(p => p !== nombre) || null;
+}
+
+function renderQuienSoyOpts() {
+  const wrap = document.getElementById('quien-soy-opts');
+  if (!wrap) return;
+  const actual = localStorage.getItem('doldi_quien_soy');
+  wrap.innerHTML = PERSONAS.map(nombre => {
+    const activo = actual === nombre;
+    return `<div class="qty-btn" style="${activo?'background:var(--orange-soft); border-color:var(--orange);':''}" onclick="elegirQuienSoy('${nombre}')">${nombre}${activo?' ✓':''}</div>`;
+  }).join('');
+}
+
+function elegirQuienSoy(nombre) {
+  localStorage.setItem('doldi_quien_soy', nombre);
+  renderQuienSoyOpts();
+  aplicarQuienSoyGuardado();
+  showToast('Listo, quedaste como ' + nombre);
+}
+
+// Le avisa a OneSignal quién es esta persona (para poder mandarle avisos
+// específicamente a "la otra"). Se llama al elegir el nombre y también al
+// cargar la app, una vez que el SDK de OneSignal terminó de iniciar.
+function aplicarQuienSoyGuardado() {
+  const nombre = localStorage.getItem('doldi_quien_soy');
+  if (!nombre || !window.OneSignalDeferred) return;
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.Notifications.requestPermission();
+      await OneSignal.User.addTag('persona', nombre);
+    } catch (e) {
+      // Si el navegador bloquea los permisos no pasa nada grave, seguimos igual.
+    }
+  });
+}
+
+function guardarOneSignalKey() {
+  const val = document.getElementById('onesignal-key-input').value.trim();
+  if (!val) {
+    showToast('Pegá la clave antes de guardar');
+    return;
+  }
+  localStorage.setItem('doldi_onesignal_key', val);
+  document.getElementById('onesignal-key-input').value = '';
+  showToast('Clave guardada en este celular');
+}
+
+// Avisa a "la otra persona" que hay un pedido nuevo para preparar. Si este
+// celular no tiene configurado quién es, o no tiene guardada la clave de
+// OneSignal, no hace nada (no bloquea ni molesta con errores).
+async function notificarPedidoNuevo(pedido) {
+  const yo = localStorage.getItem('doldi_quien_soy');
+  const key = localStorage.getItem('doldi_onesignal_key');
+  const destino = otraPersona(yo);
+  if (!yo || !key || !destino) return;
+  try {
+    await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Basic ' + key
+      },
+      body: JSON.stringify({
+        app_id: '388fca65-069d-41e4-a5bf-126e256dc778',
+        filters: [{ field: 'tag', key: 'persona', relation: '=', value: destino }],
+        headings: { en: 'Nuevo pedido — Doldi Chipa' },
+        contents: { en: (pedido.cliente || 'Cliente') + ': ' + resumenItemsPedido(pedido.items) }
+      })
+    });
+  } catch (e) {
+    // Si falla el envío del aviso, no interrumpe el guardado del pedido.
+  }
+}
+
 /* ================= STORAGE (lee/escribe en la nube) ================= */
 async function saveStock() {
   if (!db) {
@@ -576,6 +654,8 @@ function irATab(name) {
     renderConfigPuntos();
     document.getElementById('clientes-buscar-input').value = '';
     renderListaClientes();
+  } else if (name === 'config') {
+    renderQuienSoyOpts();
   }
 }
 
@@ -1124,8 +1204,42 @@ function renderRemis() {
     return `<div class="venta-item">
       <div><div class="p">${esIngreso?'🟢':'🔴'} ${label}</div><div class="t">${hora}</div></div>
       <div class="m" style="color:${color};">${signo} ${fmtMoney(m.monto)}</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarRemisUI('${m.id}')">✕</button>
     </div>`;
   }).join('');
+}
+
+function eliminarRemisUI(id) {
+  const mov = STATE.remis.find(m => m.id === id);
+  if (!mov) return;
+  const label = mov.concepto ? mov.concepto : (mov.tipo === 'ingreso' ? 'Ingreso' : 'Gasto');
+  confirmarAccion(
+    'Eliminar movimiento: ' + label,
+    'Se ajusta la caja para descontar este movimiento. No se puede deshacer.',
+    () => eliminarRemisConfirmado(id)
+  );
+}
+
+async function eliminarRemisConfirmado(id) {
+  const mov = STATE.remis.find(m => m.id === id);
+  if (!mov) return;
+  if (!db) {
+    showToast('No está conectado a la nube (menú → Configuración)');
+    return;
+  }
+  try {
+    STATE.caja.total = (STATE.caja.total || 0) - (mov.tipo === 'ingreso' ? mov.monto : -mov.monto);
+    await Promise.all([
+      db.collection('doldichipa_remis').doc(id).delete(),
+      saveCaja()
+    ]);
+    showToast('Movimiento eliminado');
+  } catch (e) {
+    showToast('No se pudo eliminar el movimiento');
+  }
+  renderRemis();
+  renderCaja();
+  renderResumen();
 }
 
 let remisMovTipo = 'ingreso';
@@ -1823,6 +1937,7 @@ async function guardarPedido() {
         creadoTs: Date.now()
       });
       showToast('Pedido guardado');
+      notificarPedidoNuevo({ cliente, items: pedidoItemsActual });
     }
     cerrarModal('overlay-pedido-form');
     pedidoItemsActual = [];
