@@ -331,7 +331,7 @@ async function notificarPedidoNuevo(pedido) {
   const destino = otraPersona(yo);
   if (!yo || !destino || !NOTIFICAR_URL || NOTIFICAR_URL.includes('PEGAR_ACA')) return;
   try {
-    await fetch(NOTIFICAR_URL, {
+    const resp = await fetch(NOTIFICAR_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -340,8 +340,14 @@ async function notificarPedidoNuevo(pedido) {
         mensaje: (pedido.cliente || 'Cliente') + ': ' + resumenItemsPedido(pedido.items)
       })
     });
+    if (!resp.ok) {
+      const detalle = await resp.text().catch(() => '');
+      console.error('Fallo al notificar:', resp.status, detalle);
+      showToast('Pedido guardado, pero no se pudo avisar por notificación');
+    }
   } catch (e) {
-    // Si falla el envío del aviso, no interrumpe el guardado del pedido.
+    console.error('Fallo al notificar:', e);
+    showToast('Pedido guardado, pero no se pudo avisar por notificación');
   }
 }
 
