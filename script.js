@@ -321,7 +321,7 @@ function aplicarQuienSoyGuardado() {
 // URL de la función de Netlify que reenvía el aviso a OneSignal de forma
 // segura (la clave secreta vive en Netlify, nunca acá ni en GitHub).
 // Se actualiza una sola vez, cuando Netlify te da la URL de tu sitio.
-const NOTIFICAR_URL = 'PEGAR_ACA_LA_URL_DE_NETLIFY/.netlify/functions/notificar';
+const NOTIFICAR_URL = 'https://fanciful-frangipane-0ae108.netlify.app/.netlify/functions/notificar';
 
 // Avisa a "la otra persona" que hay un pedido nuevo para preparar. Si este
 // celular no tiene configurado quién es, o todavía no se conectó Netlify,
