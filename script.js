@@ -318,37 +318,26 @@ function aplicarQuienSoyGuardado() {
   });
 }
 
-function guardarOneSignalKey() {
-  const val = document.getElementById('onesignal-key-input').value.trim();
-  if (!val) {
-    showToast('Pegá la clave antes de guardar');
-    return;
-  }
-  localStorage.setItem('doldi_onesignal_key', val);
-  document.getElementById('onesignal-key-input').value = '';
-  showToast('Clave guardada en este celular');
-}
+// URL de la función de Netlify que reenvía el aviso a OneSignal de forma
+// segura (la clave secreta vive en Netlify, nunca acá ni en GitHub).
+// Se actualiza una sola vez, cuando Netlify te da la URL de tu sitio.
+const NOTIFICAR_URL = 'PEGAR_ACA_LA_URL_DE_NETLIFY/.netlify/functions/notificar';
 
 // Avisa a "la otra persona" que hay un pedido nuevo para preparar. Si este
-// celular no tiene configurado quién es, o no tiene guardada la clave de
-// OneSignal, no hace nada (no bloquea ni molesta con errores).
+// celular no tiene configurado quién es, o todavía no se conectó Netlify,
+// no hace nada (no bloquea ni molesta con errores).
 async function notificarPedidoNuevo(pedido) {
   const yo = localStorage.getItem('doldi_quien_soy');
-  const key = localStorage.getItem('doldi_onesignal_key');
   const destino = otraPersona(yo);
-  if (!yo || !key || !destino) return;
+  if (!yo || !destino || !NOTIFICAR_URL || NOTIFICAR_URL.includes('PEGAR_ACA')) return;
   try {
-    await fetch('https://onesignal.com/api/v1/notifications', {
+    await fetch(NOTIFICAR_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': 'Basic ' + key
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        app_id: '388fca65-069d-41e4-a5bf-126e256dc778',
-        filters: [{ field: 'tag', key: 'persona', relation: '=', value: destino }],
-        headings: { en: 'Nuevo pedido — Doldi Chipa' },
-        contents: { en: (pedido.cliente || 'Cliente') + ': ' + resumenItemsPedido(pedido.items) }
+        destino,
+        titulo: 'Nuevo pedido — Doldi Chipa',
+        mensaje: (pedido.cliente || 'Cliente') + ': ' + resumenItemsPedido(pedido.items)
       })
     });
   } catch (e) {
