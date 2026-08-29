@@ -336,8 +336,8 @@ async function notificarPedidoNuevo(pedido) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         destino,
-        titulo: 'Nuevo pedido — Doldi Chipa',
-        mensaje: (pedido.cliente || 'Cliente') + ': ' + resumenItemsPedido(pedido.items)
+        titulo: pedido.cliente || 'Cliente',
+        mensaje: resumenItemsPedido(pedido.items)
       })
     });
     if (!resp.ok) {
