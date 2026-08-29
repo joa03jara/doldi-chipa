@@ -933,6 +933,9 @@ function renderPrecios() {
       rows = (p.variantes || []).map(v => `<div class="row-input"><label>${v.label}</label>
         <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-${v.key}" oninput="formatMiles(this)"></div>
       </div>`).join('');
+      rows += `<div class="row-input"><label>Precio por unidad suelta (opcional)</label>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-suelta" oninput="formatMiles(this)"></div>
+      </div>`;
     }
     return `<div class="acc-item">
       <button class="acc-header" data-target="${accId}" data-group="precios" onclick="toggleAccordion('${accId}','precios')">
@@ -955,6 +958,8 @@ function renderPrecios() {
         const el = document.getElementById('p-' + prod + '-' + v.key);
         if (el) el.value = precProd[v.key] ? precProd[v.key].toLocaleString('es-AR') : '';
       });
+      const elSuelta = document.getElementById('p-' + prod + '-suelta');
+      if (elSuelta) elSuelta.value = precProd.suelta ? precProd.suelta.toLocaleString('es-AR') : '';
     }
   });
   const envio = pr.envio || {};
@@ -980,6 +985,12 @@ async function guardarPrecios() {
         prod,
         key: v.key
       }));
+      campos.push({
+        id: 'p-' + prod + '-suelta',
+        prod,
+        key: 'suelta',
+        opcional: true
+      });
     }
   });
   campos.push({
@@ -1000,7 +1011,7 @@ async function guardarPrecios() {
     const val = parseMiles(el.value);
     if (!STATE.precios[c.prod]) STATE.precios[c.prod] = {};
     STATE.precios[c.prod][c.key] = val;
-    if (val <= 0) {
+    if (val <= 0 && !c.opcional) {
       faltantes++;
       el.style.borderColor = 'var(--red)';
     } else {
@@ -1067,10 +1078,12 @@ function renderVentas() {
         year: 'numeric'
       });
       const envioTxt = v.envio === 'cerca' ? 'envío cerca' : v.envio === 'lejos' ? 'envío lejos' : '';
+      const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
       const texto = [
         STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod,
         v.qtyLabel || '',
         envioTxt,
+        pedidoVinculado ? pedidoVinculado.cliente : '',
         fecha1, fecha2,
         String(v.monto),
         fmtMoney(v.monto)
@@ -1093,9 +1106,11 @@ function renderVentas() {
     });
     const envioTxt = v.envio === 'cerca' ? ' + envío cerca' : v.envio === 'lejos' ? ' + envío lejos' : '';
     const nombreProd = STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod;
+    const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
+    const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
     return `<div class="venta-item">
       <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
-      <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${hora}</div></div>
+      <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
       <div class="m">${fmtMoney(v.monto)}</div>
       <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarVentaUI('${v.id}')">✕</button>
     </div>`;
@@ -2379,6 +2394,8 @@ function abrirElegirProducto() {
 
 let libreQtyProd = null;
 let libreQtyActual = 1;
+let libreQtyModo = 'libre'; // 'libre' | 'suelta' | 'variante'
+let libreQtyVarianteKey = null; // solo cuando el modo es 'variante'
 
 function abrirSelectorCantidad(prod) {
   const p = STATE.productos[prod];
@@ -2393,39 +2410,86 @@ function abrirSelectorCantidad(prod) {
 
   if (p.pricingMode === 'libre') {
     // Cantidad libre con +/-
-    libreQtyProd = prod;
-    libreQtyActual = 1;
-    wrap.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:center; gap:24px; padding:14px 0 6px;">
-        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(-1)">−</button>
-        <div style="font-size:34px; font-weight:800; min-width:56px; text-align:center;" id="libre-qty-display">1</div>
-        <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(1)">+</button>
-      </div>
-      <p class="muted" style="text-align:center; margin:4px 0 14px;" id="libre-qty-precio">$0</p>
-      <button class="btn btn-green btn-block" onclick="confirmarCantidadLibre()">Continuar</button>
-    `;
-    actualizarDisplayLibre();
+    abrirContadorCantidad(prod, 'libre');
   } else {
     (p.variantes || []).forEach(o => {
       const btn = document.createElement('div');
       btn.className = 'qty-btn';
       btn.style.textAlign = 'left';
       btn.innerHTML = `${o.label} <span class="p">${fmtMoney(precioFor(prod,o.key))}</span>`;
-      btn.onclick = () => {
-        cerrarModal('overlay-qty');
-        iniciarVenta(prod, o.key);
-      };
+      // Cada opción (media docena, docena, etc.) tiene su propio contador
+      // +/-, para poder pedir "3 docenas" de una sola vez sin repetir el
+      // paso de agregar producto tres veces.
+      btn.onclick = () => abrirContadorCantidad(prod, 'variante', o.key);
       wrap.appendChild(btn);
     });
+    // Si el producto tiene precio por unidad suelta cargado, agregar la
+    // opción de vender sueltas (para cuando quedan piezas sin completar
+    // una docena/media docena entera).
+    const precioSuelta = (STATE.precios[prod] && STATE.precios[prod].suelta) || 0;
+    if (precioSuelta > 0) {
+      const btnSuelta = document.createElement('div');
+      btnSuelta.className = 'qty-btn';
+      btnSuelta.style.textAlign = 'left';
+      btnSuelta.innerHTML = `Vender sueltas <span class="p">${fmtMoney(precioSuelta)} c/u</span>`;
+      btnSuelta.onclick = () => abrirContadorCantidad(prod, 'suelta');
+      wrap.appendChild(btnSuelta);
+    }
   }
   mostrarOverlay('overlay-qty');
+}
+
+// Contador +/- reutilizado para: productos "por unidad", venta de unidades
+// sueltas de un producto por docena, y para pedir varias docenas/medias
+// docenas de una sola vez.
+function abrirContadorCantidad(prod, modo, varianteKey) {
+  libreQtyProd = prod;
+  libreQtyActual = 1;
+  libreQtyModo = modo;
+  libreQtyVarianteKey = varianteKey || null;
+  const wrap = document.getElementById('qty-options');
+  wrap.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:center; gap:24px; padding:14px 0 6px;">
+      <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(-1)">−</button>
+      <div style="font-size:34px; font-weight:800; min-width:56px; text-align:center;" id="libre-qty-display">1</div>
+      <button class="btn btn-gold" style="width:52px; height:52px; border-radius:50%; font-size:26px; padding:0; line-height:1;" onclick="cambiarCantidadLibre(1)">+</button>
+    </div>
+    <p class="muted" style="text-align:center; margin:4px 0 14px;" id="libre-qty-precio">$0</p>
+    <button class="btn btn-green btn-block" onclick="confirmarCantidadLibre()">Continuar</button>
+  `;
+  actualizarDisplayLibre();
+}
+
+// Cuántas "unidades sueltas" entran en una docena, para poder descontar
+// del stock (que se lleva en docenas) correctamente.
+function unidadesPorDocena(prod) {
+  return 12;
+}
+
+// Cuántas docenas-equivalentes representa 1 unidad de cantidad actual,
+// según el modo (para chequear stock disponible).
+function qtyDocenasPorUnidad(prod) {
+  if (libreQtyModo === 'suelta') return 1 / unidadesPorDocena(prod);
+  if (libreQtyModo === 'variante') {
+    const p = STATE.productos[prod];
+    const variante = (p.variantes || []).find(v => v.key === libreQtyVarianteKey);
+    return variante ? variante.qty : 1;
+  }
+  return 1; // 'libre'
+}
+
+function precioPorUnidadActual(prod) {
+  if (libreQtyModo === 'suelta') return (STATE.precios[prod] && STATE.precios[prod].suelta) || 0;
+  if (libreQtyModo === 'variante') return precioFor(prod, libreQtyVarianteKey);
+  return (STATE.precios[prod] && STATE.precios[prod].unidad) || 0;
 }
 
 function cambiarCantidadLibre(delta) {
   const nueva = libreQtyActual + delta;
   if (nueva < 1) return;
   const stockVal = stockDisponiblePedido(libreQtyProd);
-  if (nueva > stockVal) {
+  const qtyEquivalente = nueva * qtyDocenasPorUnidad(libreQtyProd);
+  if (qtyEquivalente > stockVal) {
     showToast('No hay suficiente stock de ' + STATE.productos[libreQtyProd].label + ' (' + fmtCantidad(libreQtyProd, stockVal) + ' disponibles)');
     return;
   }
@@ -2435,19 +2499,34 @@ function cambiarCantidadLibre(delta) {
 
 function actualizarDisplayLibre() {
   document.getElementById('libre-qty-display').textContent = libreQtyActual;
-  const precioUnidad = (STATE.precios[libreQtyProd] && STATE.precios[libreQtyProd].unidad) || 0;
+  const precioUnidad = precioPorUnidadActual(libreQtyProd);
   document.getElementById('libre-qty-precio').textContent = fmtMoney(precioUnidad * libreQtyActual);
 }
 
 function confirmarCantidadLibre() {
   const p = STATE.productos[libreQtyProd];
-  const precioUnidad = (STATE.precios[libreQtyProd] && STATE.precios[libreQtyProd].unidad) || 0;
+  const precioUnidad = precioPorUnidadActual(libreQtyProd);
   cerrarModal('overlay-qty');
-  iniciarVenta(libreQtyProd, 'custom', {
-    qty: libreQtyActual,
-    label: libreQtyActual + ' ' + p.unit,
-    monto: precioUnidad * libreQtyActual
-  });
+  if (libreQtyModo === 'suelta') {
+    iniciarVenta(libreQtyProd, 'custom', {
+      qty: libreQtyActual / unidadesPorDocena(libreQtyProd),
+      label: libreQtyActual + ' suelta' + (libreQtyActual === 1 ? '' : 's'),
+      monto: precioUnidad * libreQtyActual
+    });
+  } else if (libreQtyModo === 'variante') {
+    const variante = (p.variantes || []).find(v => v.key === libreQtyVarianteKey);
+    iniciarVenta(libreQtyProd, 'custom', {
+      qty: variante.qty * libreQtyActual,
+      label: libreQtyActual > 1 ? (libreQtyActual + ' x ' + variante.label) : variante.label,
+      monto: precioUnidad * libreQtyActual
+    });
+  } else {
+    iniciarVenta(libreQtyProd, 'custom', {
+      qty: libreQtyActual,
+      label: libreQtyActual + ' ' + p.unit,
+      monto: precioUnidad * libreQtyActual
+    });
+  }
 }
 
 
