@@ -689,7 +689,14 @@
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({ appId: "388fca65-069d-41e4-a5bf-126e256dc778" });
+      await OneSignal.init({
+        appId: "388fca65-069d-41e4-a5bf-126e256dc778",
+        // El sitio vive en /doldi-chipa/ (no en la raíz del dominio), así
+        // que hay que decirle a OneSignal exactamente dónde está el archivo
+        // del service worker que subimos.
+        serviceWorkerPath: "doldi-chipa/OneSignalSDKWorker.js",
+        serviceWorkerParam: { scope: "/doldi-chipa/" }
+      });
       window.__oneSignalListo = true;
       if (typeof aplicarQuienSoyGuardado === 'function') aplicarQuienSoyGuardado();
     });
