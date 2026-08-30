@@ -1048,7 +1048,9 @@ function renderVentas() {
 
   const wrap = document.getElementById('ventas-list');
   const searchEl = document.getElementById('ventas-search');
-  const term = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  // Sin tildes, para que buscar "maria" encuentre "María" igual.
+  const sinTildes = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const term = searchEl ? sinTildes(searchEl.value.trim().toLowerCase()) : '';
   let listFiltrada = list;
   if (term) {
     listFiltrada = list.filter(v => {
@@ -1064,7 +1066,7 @@ function renderVentas() {
       });
       const envioTxt = v.envio === 'cerca' ? 'envío cerca' : v.envio === 'lejos' ? 'envío lejos' : '';
       const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
-      const texto = [
+      const texto = sinTildes([
         STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod,
         v.qtyLabel || '',
         envioTxt,
@@ -1072,7 +1074,7 @@ function renderVentas() {
         fecha1, fecha2,
         String(v.monto),
         fmtMoney(v.monto)
-      ].join(' ').toLowerCase();
+      ].join(' ').toLowerCase());
       return texto.includes(term);
     });
   }
@@ -1080,24 +1082,56 @@ function renderVentas() {
     wrap.innerHTML = `<div class="empty">${term ? 'No se encontraron ventas para "'+searchEl.value+'".' : 'Todavía no hay ventas registradas en este período.'}</div>`;
     return;
   }
-  wrap.innerHTML = listFiltrada.map(v => {
+
+  // Agrupar por día: cada día es un encabezado con su total, y debajo las
+  // ventas de ese día (así no hay que mirar dos lugares distintos para
+  // "cuánto hice" y "qué vendí" en una fecha puntual).
+  const grupos = [];
+  let grupoActual = null;
+  listFiltrada.forEach(v => {
     const d = new Date(v.ts);
-    const hora = d.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit'
-    }) + ' ' + d.toLocaleTimeString('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    const envioTxt = v.envio === 'cerca' ? ' + envío cerca' : v.envio === 'lejos' ? ' + envío lejos' : '';
-    const nombreProd = STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod;
-    const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
-    const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
-    return `<div class="venta-item">
-      <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
-      <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
-      <div class="m">${fmtMoney(v.monto)}</div>
-      <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarVentaUI('${v.id}')">✕</button>
+    const clave = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    if (!grupoActual || grupoActual.clave !== clave) {
+      grupoActual = {
+        clave,
+        etiqueta: d.toLocaleDateString('es-AR', {
+          weekday: 'long',
+          day: '2-digit',
+          month: '2-digit'
+        }),
+        total: 0,
+        ventas: []
+      };
+      grupos.push(grupoActual);
+    }
+    grupoActual.total += v.monto;
+    grupoActual.ventas.push(v);
+  });
+
+  wrap.innerHTML = grupos.map(g => {
+    const etiqueta = g.etiqueta.charAt(0).toUpperCase() + g.etiqueta.slice(1);
+    const filasVentas = g.ventas.map(v => {
+      const hora = new Date(v.ts).toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const envioTxt = v.envio === 'cerca' ? ' + envío cerca' : v.envio === 'lejos' ? ' + envío lejos' : '';
+      const nombreProd = STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod;
+      const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
+      const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
+      return `<div class="venta-item">
+        <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
+        <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
+        <div class="m">${fmtMoney(v.monto)}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarVentaUI('${v.id}')">✕</button>
+      </div>`;
+    }).join('');
+    return `<div class="historial-row">
+      <div class="historial-top">
+        <span class="historial-label">${etiqueta}</span>
+        <span class="historial-monto">${fmtMoney(g.total)}</span>
+      </div>
+      ${filasVentas}
     </div>`;
   }).join('');
 }

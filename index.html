@@ -216,7 +216,7 @@
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:26px; font-size:18px;">Historial</div>
+      <div class="section-title" style="margin-top:26px; font-size:18px;">Evolución</div>
       <div class="segmented">
         <button class="active" data-periodo="dia" onclick="cambiarPeriodoHistorial('dia')">Por día</button>
         <button data-periodo="semana" onclick="cambiarPeriodoHistorial('semana')">Por semana</button>
@@ -230,7 +230,6 @@
       <div class="lbl" id="ventas-count" style="margin:-8px 0 12px 4px; color:var(--text-2); font-size:12.5px;">0 ventas</div>
       <div class="card" id="ventas-resumen"></div>
       <div class="card">
-        <h2>Historial</h2>
         <input type="text" id="ventas-search" placeholder="Buscar por cliente, producto, monto o fecha (ej: Naldo, factura, 4500)" oninput="renderVentas()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
         <div id="ventas-list"></div>
       </div>
