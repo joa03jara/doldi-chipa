@@ -57,7 +57,10 @@ exports.handler = async function (event) {
         // aplicarQuienSoyGuardado en script.js), nunca a los dos a la vez.
         filters: [{ field: 'tag', key: 'persona', relation: '=', value: destino }],
         headings: { en: titulo || 'Nuevo pedido — Doldi Chipa' },
-        contents: { en: mensaje }
+        contents: { en: mensaje },
+        // Ícono de la app en el "avatar" chiquito de la notificación
+        // (en vez de la letra genérica que pone Android por defecto).
+        chrome_web_icon: 'https://joa03jara.github.io/doldi-chipa/icon-192.png'
       })
     });
     const data = await resp.json();
