@@ -73,6 +73,7 @@ body {
 
 header.app {
   padding: 14px 18px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   gap: 12px;
