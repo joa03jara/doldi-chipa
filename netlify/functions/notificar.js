@@ -60,7 +60,10 @@ exports.handler = async function (event) {
         contents: { en: mensaje },
         // Ícono de la app en el "avatar" chiquito de la notificación
         // (en vez de la letra genérica que pone Android por defecto).
-        chrome_web_icon: 'https://joa03jara.github.io/doldi-chipa/icon-192.png'
+        chrome_web_icon: 'https://joa03jara.github.io/doldi-chipa/icon-192.png',
+        // Dirección exacta a la que va la notificación al tocarla (sin esto,
+        // algunos navegadores la mandan solo al dominio y da error 404).
+        url: 'https://joa03jara.github.io/doldi-chipa/'
       })
     });
     const data = await resp.json();
