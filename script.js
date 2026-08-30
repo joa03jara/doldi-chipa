@@ -752,8 +752,6 @@ function abrirProductoForm(editId) {
       document.getElementById(o.checkboxId).checked = true;
     });
   }
-  document.getElementById('pf-precio-unidad').value = '';
-
   seleccionarEmojiForm(pfEmojiActual);
   seleccionarModoPrecio(pfModoActual);
   mostrarOverlay('overlay-producto-form');
@@ -770,7 +768,6 @@ function seleccionarModoPrecio(modo) {
   pfModoActual = modo;
   document.getElementById('pf-modo-libre').classList.toggle('active', modo === 'libre');
   document.getElementById('pf-modo-variantes').classList.toggle('active', modo === 'variantes');
-  document.getElementById('pf-precio-libre-wrap').style.display = modo === 'libre' ? 'block' : 'none';
   document.getElementById('pf-variantes-wrap').style.display = modo === 'variantes' ? 'block' : 'none';
 }
 
@@ -900,18 +897,6 @@ function renderStock() {
   });
   wrap.innerHTML = html;
 
-  const proy = document.getElementById('proyeccion');
-  let total = 0;
-  let rows = '';
-  ids.forEach(prod => {
-    const p = STATE.productos[prod];
-    const val = STATE.stock[prod] || 0;
-    const monto = val * precioRefPorUnidad(prod);
-    total += monto;
-    rows += `<div class="prod-row"><div class="prod-icon">${prodIconHtml(prod)}</div><div style="flex:1;" class="prod-name">${p.label}</div><div class="stock-num">${fmtMoney(monto)}</div></div>`;
-  });
-  proy.innerHTML = rows + `<div class="prod-row"><div class="prod-name" style="flex:1;">Total proyectado</div><div class="stock-num" style="color:var(--orange-dark)">${fmtMoney(total)}</div></div>`;
-
   const totalVendidoReal = STATE.ventas.reduce((s, v) => s + v.monto, 0);
   document.getElementById('total-vendido-real').textContent = fmtMoney(totalVendidoReal);
 }
@@ -933,7 +918,7 @@ function renderPrecios() {
       rows = (p.variantes || []).map(v => `<div class="row-input"><label>${v.label}</label>
         <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-${v.key}" oninput="formatMiles(this)"></div>
       </div>`).join('');
-      rows += `<div class="row-input"><label>Precio por unidad suelta (opcional)</label>
+      rows += `<div class="row-input"><label>Unidad suelta (opcional)</label>
         <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-suelta" oninput="formatMiles(this)"></div>
       </div>`;
     }
@@ -1920,12 +1905,16 @@ function validarPedidoForm() {
   return true;
 }
 
+let guardandoPedido = false; // evita que tocar "Guardar pedido" varias veces seguidas duplique el pedido
+
 async function guardarPedido() {
+  if (guardandoPedido) return;
   if (!validarPedidoForm()) return;
   if (!db) {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
   }
+  guardandoPedido = true;
   const cliente = document.getElementById('ped-cliente').value.trim() || 'Sin nombre';
   const direccion = document.getElementById('ped-direccion').value.trim();
   try {
@@ -1955,6 +1944,8 @@ async function guardarPedido() {
     pedidoEditId = null;
   } catch (e) {
     showToast('No se pudo guardar el pedido');
+  } finally {
+    guardandoPedido = false;
   }
 }
 
