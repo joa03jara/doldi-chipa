@@ -912,14 +912,14 @@ function renderPrecios() {
     let rows;
     if (p.pricingMode === 'libre') {
       rows = `<div class="row-input"><label>Precio por ${p.unit}</label>
-        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-unidad" oninput="formatMiles(this)"></div>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-unidad" autocomplete="off" oninput="formatMiles(this)"></div>
       </div>`;
     } else {
       rows = (p.variantes || []).map(v => `<div class="row-input"><label>${v.label}</label>
-        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-${v.key}" oninput="formatMiles(this)"></div>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-${v.key}" autocomplete="off" oninput="formatMiles(this)"></div>
       </div>`).join('');
       rows += `<div class="row-input"><label>Unidad suelta (opcional)</label>
-        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-suelta" oninput="formatMiles(this)"></div>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-${prod}-suelta" autocomplete="off" oninput="formatMiles(this)"></div>
       </div>`;
     }
     return `<div class="acc-item">
@@ -1110,20 +1110,51 @@ function renderVentas() {
 
   wrap.innerHTML = grupos.map(g => {
     const etiqueta = g.etiqueta.charAt(0).toUpperCase() + g.etiqueta.slice(1);
-    const filasVentas = g.ventas.map(v => {
-      const hora = new Date(v.ts).toLocaleTimeString('es-AR', {
+
+    // Dentro de cada día, agrupar además por pedido: si un cliente compró
+    // varias cosas en el mismo pedido (ej: chipá + factura), que aparezca
+    // en una sola fila con todo junto, no una fila por cada producto.
+    const subgrupos = [];
+    const porPedido = {};
+    g.ventas.forEach(v => {
+      const clave = v.pedidoId || ('sola_' + v.id);
+      if (!porPedido[clave]) {
+        porPedido[clave] = {
+          ids: [],
+          items: [],
+          monto: 0,
+          ts: v.ts,
+          pedidoId: v.pedidoId || null
+        };
+        subgrupos.push(porPedido[clave]);
+      }
+      porPedido[clave].ids.push(v.id);
+      porPedido[clave].items.push(v);
+      porPedido[clave].monto += v.monto;
+      if (v.ts > porPedido[clave].ts) porPedido[clave].ts = v.ts;
+    });
+
+    const filasVentas = subgrupos.map(sg => {
+      const hora = new Date(sg.ts).toLocaleTimeString('es-AR', {
         hour: '2-digit',
         minute: '2-digit'
       });
-      const envioTxt = v.envio === 'cerca' ? ' + envío cerca' : v.envio === 'lejos' ? ' + envío lejos' : '';
-      const nombreProd = STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod;
-      const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
+      const pedidoVinculado = sg.pedidoId ? STATE.pedidos.find(p => p.id === sg.pedidoId) : null;
       const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
+      const envioItem = sg.items.find(i => i.envio);
+      const envioTxt = envioItem ? (envioItem.envio === 'cerca' ? ' + envío cerca' : ' + envío lejos') : '';
+      const nombresTxt = sg.items.map(i => {
+        const nombreProd = STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod;
+        return i.qtyLabel ? (i.qtyLabel + ' de ' + nombreProd) : nombreProd;
+      }).join(', ');
+      // Un solo ícono representativo (el del primer producto del grupo).
+      const iconoProd = sg.items[0].prod;
+      const idsJson = JSON.stringify(sg.ids).replace(/"/g, '&quot;');
       return `<div class="venta-item">
-        <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(v.prod,15)}</div>
-        <div style="flex:1;"><div class="p">${nombreProd}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
-        <div class="m">${fmtMoney(v.monto)}</div>
-        <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick="eliminarVentaUI('${v.id}')">✕</button>
+        <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(iconoProd,15)}</div>
+        <div style="flex:1;"><div class="p">${nombresTxt}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
+        <div class="m">${fmtMoney(sg.monto)}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick='eliminarGrupoVentaUI(${idsJson})'>✕</button>
       </div>`;
     }).join('');
     return `<div class="historial-row">
@@ -1147,7 +1178,38 @@ function eliminarVentaUI(id) {
   );
 }
 
-async function eliminarVentaConfirmada(id) {
+// Igual que eliminarVentaUI, pero para cuando un pedido tuvo varios productos
+// juntos (ej: chipá + factura) — se borran todos a la vez, no uno por uno.
+function eliminarGrupoVentaUI(ids) {
+  if (!ids || ids.length === 0) return;
+  if (ids.length === 1) {
+    eliminarVentaUI(ids[0]);
+    return;
+  }
+  const ventas = ids.map(id => STATE.ventas.find(v => v.id === id)).filter(Boolean);
+  const totalGrupo = ventas.reduce((s, v) => s + v.monto, 0);
+  confirmarAccion(
+    'Eliminar este pedido (' + ventas.length + ' productos)',
+    'Se devuelve el stock vendido y se descuenta ' + fmtMoney(totalGrupo) + ' de la caja. No se puede deshacer.',
+    () => eliminarGrupoVentaConfirmado(ids)
+  );
+}
+
+async function eliminarGrupoVentaConfirmado(ids) {
+  for (const id of ids) {
+    await eliminarVentaConfirmada(id, {
+      silencioso: true
+    });
+  }
+  showToast('Pedido eliminado del historial');
+  renderVentas();
+  renderStock();
+  renderCaja();
+  renderResumen();
+  renderPedidos();
+}
+
+async function eliminarVentaConfirmada(id, opts) {
   const venta = STATE.ventas.find(v => v.id === id);
   if (!venta) return;
   if (!db) {
@@ -1170,15 +1232,18 @@ async function eliminarVentaConfirmada(id) {
       }
     }
     await Promise.all(promesas);
-    showToast('Venta eliminada');
+    STATE.ventas = STATE.ventas.filter(v => v.id !== id);
+    if (!(opts && opts.silencioso)) showToast('Venta eliminada');
   } catch (e) {
-    showToast('No se pudo eliminar la venta');
+    if (!(opts && opts.silencioso)) showToast('No se pudo eliminar la venta');
   }
-  renderVentas();
-  renderStock();
-  renderCaja();
-  renderResumen();
-  renderPedidos();
+  if (!(opts && opts.silencioso)) {
+    renderVentas();
+    renderStock();
+    renderCaja();
+    renderResumen();
+    renderPedidos();
+  }
 }
 
 /* ================= FILTRO POR RANGO (compartido) ================= */
@@ -1730,7 +1795,7 @@ function renderClienteVenta() {
   if (c.esNuevo) {
     html += `
       <p class="muted" style="margin:4px 0; color:var(--orange-dark); font-weight:600;">Cliente nuevo, se va a crear al confirmar el pedido.</p>
-      <input type="text" id="venta-cliente-nombre" placeholder="Nombre (opcional)" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text); margin-bottom:8px;">
+      <input type="text" id="venta-cliente-nombre" autocomplete="off" placeholder="Nombre (opcional)" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text); margin-bottom:8px;">
     `;
   } else {
     html += `<div class="prod-row"><div class="prod-name" style="flex:1;">${c.nombre || 'Sin nombre'}</div><div class="stock-num" style="color:var(--orange-dark);">${c.puntos} pts</div></div>`;
@@ -2129,7 +2194,10 @@ function aplicarDescuentoAItems(items, descuentoTotal) {
   return items;
 }
 
+let confirmandoVenta = false; // evita duplicar la venta si se toca "Confirmar pedido" varias veces seguidas
+
 async function confirmarVenta() {
+  if (confirmandoVenta) return;
   if (carrito.length === 0) return;
   if (typeof envioSeleccionado === 'undefined') {
     showToast('Elegí una opción de envío (o "Sin envío") antes de confirmar');
@@ -2139,7 +2207,15 @@ async function confirmarVenta() {
     showToast('No está conectado a la nube (menú → Configuración)');
     return;
   }
+  confirmandoVenta = true;
+  try {
+    await confirmarVentaInterno();
+  } finally {
+    confirmandoVenta = false;
+  }
+}
 
+async function confirmarVentaInterno() {
   // Chequeo de seguridad: que el premio elegido siga siendo válido para este cliente
   if (premioSeleccionadoVenta && clienteVentaActual && clienteVentaActual.puntos < premioSeleccionadoVenta.costoPuntos) {
     showToast('Ese cliente ya no tiene puntos suficientes para ese premio');

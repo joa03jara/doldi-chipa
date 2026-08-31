@@ -168,10 +168,10 @@
           </button>
           <div class="acc-body" id="acc-precio-envio" data-group="precios">
             <div class="row-input"><label>Envío cerca</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-envio-cerca" oninput="formatMiles(this)"></div>
+              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-envio-cerca" oninput="formatMiles(this)" autocomplete="off"></div>
             </div>
             <div class="row-input"><label>Envío lejos</label>
-              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-envio-lejos" oninput="formatMiles(this)"></div>
+              <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="p-envio-lejos" oninput="formatMiles(this)" autocomplete="off"></div>
             </div>
           </div>
         </div>
@@ -230,7 +230,7 @@
       <div class="lbl" id="ventas-count" style="margin:-8px 0 12px 4px; color:var(--text-2); font-size:12.5px;">0 ventas</div>
       <div class="card" id="ventas-resumen"></div>
       <div class="card">
-        <input type="text" id="ventas-search" placeholder="Buscar por cliente, producto, monto o fecha (ej: Naldo, factura, 4500)" oninput="renderVentas()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
+        <input type="text" id="ventas-search" placeholder="Buscar por cliente, producto, monto o fecha (ej: Naldo, factura, 4500)" oninput="renderVentas()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;" autocomplete="off">
         <div id="ventas-list"></div>
       </div>
     </section>
@@ -255,7 +255,7 @@
           <div class="acc-body" id="acc-clientes-puntaje" data-group="clientes">
             <div class="row-input">
               <label>Cada $1.000 gastados =</label>
-              <input type="number" id="config-puntos-input" min="1" step="1" style="width:70px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+              <input type="number" id="config-puntos-input" min="1" step="1" style="width:70px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;" autocomplete="off">
             </div>
             <button class="btn btn-sm btn-gold" style="margin-top:10px;" onclick="guardarConfigPuntos()">Guardar</button>
           </div>
@@ -272,7 +272,7 @@
             </svg>
           </button>
           <div class="acc-body" id="acc-clientes-lista" data-group="clientes">
-            <input type="text" id="clientes-buscar-input" placeholder="Buscar por nombre o DNI" oninput="renderListaClientes()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;">
+            <input type="text" id="clientes-buscar-input" placeholder="Buscar por nombre o DNI" oninput="renderListaClientes()" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13.5px; background:var(--bg); color:var(--text); margin-bottom:10px;" autocomplete="off">
             <div id="clientes-lista"></div>
           </div>
         </div>
@@ -441,7 +441,7 @@
       <p class="muted" style="margin:6px 0 6px; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Cliente (opcional, para sumar o canjear puntos)</p>
       <div class="row-input">
         <label>DNI</label>
-        <input type="text" inputmode="numeric" id="venta-cliente-dni" placeholder="Ej: 30123456" oninput="onInputClienteVenta()" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+        <input type="text" inputmode="numeric" id="venta-cliente-dni" placeholder="Ej: 30123456" oninput="onInputClienteVenta()" style="width:150px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);" autocomplete="off">
       </div>
       <div id="venta-cliente-resultado" style="margin-top:10px;"></div>
 
@@ -462,7 +462,7 @@
       <h3>Nuevo premio</h3>
       <div class="row-input" style="flex-direction:column; align-items:stretch; gap:6px;">
         <label>Nombre del premio</label>
-        <input type="text" id="premio-nombre" placeholder="Ej: Envío gratis" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+        <input type="text" id="premio-nombre" placeholder="Ej: Envío gratis" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);" autocomplete="off">
       </div>
       <p class="muted" style="font-weight:700; margin:14px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Tipo de premio</p>
       <div class="grid2" style="margin-bottom:12px;">
@@ -474,7 +474,7 @@
 
       <div class="row-input">
         <label>Cuesta (puntos)</label>
-        <input type="number" id="premio-costo-puntos" min="1" style="width:110px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+        <input type="number" id="premio-costo-puntos" min="1" style="width:110px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left;" autocomplete="off">
       </div>
       <button class="btn btn-green btn-block" style="margin-top:14px;" onclick="guardarPremioForm()">Guardar premio</button>
     </div>
@@ -489,7 +489,7 @@
       <p class="muted" style="font-weight:700; margin:10px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Agregar stock</p>
       <div class="row-input">
         <label id="agregar-stock-label">Cantidad</label>
-        <input type="number" id="agregar-stock-input" min="1" step="1" style="width:110px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+        <input type="number" id="agregar-stock-input" min="1" step="1" style="width:110px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;" autocomplete="off">
       </div>
       <button class="btn btn-gold btn-block" style="margin-top:10px;" onclick="confirmarAgregarStock()">Agregar</button>
 
@@ -499,7 +499,7 @@
         <p class="muted" style="font-weight:700; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:0.3px;">Corregir cantidad exacta</p>
         <div class="row-input">
           <label id="editar-stock-label">Cantidad</label>
-          <input type="number" id="editar-stock-input" step="0.5" min="0" style="width:120px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;">
+          <input type="number" id="editar-stock-input" step="0.5" min="0" style="width:120px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left;" autocomplete="off">
         </div>
         <button class="btn btn-green btn-block" style="margin-top:10px;" onclick="confirmarEditarStock()">Guardar cantidad exacta</button>
         <button class="btn btn-rust btn-block" style="margin-top:10px;" onclick="vaciarStock()">Vaciar (poner en 0)</button>
@@ -514,11 +514,11 @@
       <h3 id="remis-mov-title">Registrar ingreso</h3>
       <div class="row-input">
         <label>Monto</label>
-        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="remis-mov-monto" oninput="formatMiles(this)" style="width:140px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left; background:var(--bg); color:var(--text);"></div>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="remis-mov-monto" oninput="formatMiles(this)" style="width:140px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:left; background:var(--bg); color:var(--text);" autocomplete="off"></div>
       </div>
       <div class="row-input" style="flex-direction:column; align-items:stretch; gap:6px;">
         <label>Concepto</label>
-        <input type="text" id="remis-mov-concepto" placeholder="Ej: Nafta, viaje centro, pan..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);">
+        <input type="text" id="remis-mov-concepto" placeholder="Ej: Nafta, viaje centro, pan..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--bg); color:var(--text);" autocomplete="off">
       </div>
       <button class="btn btn-gold btn-block" id="remis-mov-btn" style="margin-top:14px;" onclick="confirmarRemisMov()">Guardar</button>
     </div>
@@ -532,7 +532,7 @@
       <p class="muted" style="margin-top:4px;">Poné el monto real que tenés ahora. Esto reemplaza el saldo actual (no lo suma).</p>
       <div class="row-input">
         <label>Monto</label>
-        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="ajustar-caja-input" oninput="formatMiles(this)" style="width:160px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left; background:var(--bg); color:var(--text);"></div>
+        <div><span class="prefix">$</span><input type="text" inputmode="numeric" id="ajustar-caja-input" oninput="formatMiles(this)" style="width:160px; padding:8px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; text-align:left; background:var(--bg); color:var(--text);" autocomplete="off"></div>
       </div>
       <button class="btn btn-green btn-block" style="margin-top:14px;" onclick="confirmarAjustarCaja()">Guardar</button>
     </div>
@@ -613,7 +613,7 @@
 
       <div class="form-field">
         <label>Nombre</label>
-        <input type="text" id="pf-nombre" placeholder="Ej: Hamburguesa">
+        <input type="text" id="pf-nombre" placeholder="Ej: Hamburguesa" autocomplete="off">
       </div>
 
       <div class="form-field">
