@@ -1071,6 +1071,7 @@ main {
   align-items: baseline;
   margin-bottom: 6px;
   font-size: 13.5px;
+  cursor: pointer;
 }
 .historial-row .historial-label {
   font-weight: 600;
@@ -1086,11 +1087,20 @@ main {
   border-radius: 6px;
   height: 10px;
   overflow: hidden;
+  cursor: pointer;
 }
 .historial-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--orange), var(--orange-dark));
   border-radius: 6px 0 0 6px;
+}
+.historial-detalle {
+  margin-top: 10px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+.historial-detalle .venta-item {
+  padding: 8px 0;
 }
 
 /* ================= TARJETA DE PEDIDO EN ESPERA ================= */

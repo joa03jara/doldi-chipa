@@ -226,7 +226,7 @@
         <div id="historial-lista"></div>
       </div>
 
-      <div class="section-title" style="margin-top:26px; font-size:18px;">Detalle de ventas</div>
+      <div class="section-title" style="margin-top:26px; font-size:18px;">Buscar una venta puntual</div>
       <div class="lbl" id="ventas-count" style="margin:-8px 0 12px 4px; color:var(--text-2); font-size:12.5px;">0 ventas</div>
       <div class="card" id="ventas-resumen"></div>
       <div class="card">
@@ -670,7 +670,7 @@
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
         appId: "388fca65-069d-41e4-a5bf-126e256dc778",
-        // El sitio vive en /doldi-chipa/ (no en la raíz del dominio), así
+        // El sitio vive en /DOLDI-CHIPA/ (no en la raíz del dominio), así
         // que hay que decirle a OneSignal exactamente dónde está el archivo
         // del service worker que subimos.
         serviceWorkerPath: "DOLDI-CHIPA/OneSignalSDKWorker.js",

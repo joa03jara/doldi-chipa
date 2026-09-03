@@ -1023,7 +1023,69 @@ function cambiarRango(r) {
   renderResumen();
 }
 
+// Agrupa ventas por pedido: si un cliente compró varias cosas en el mismo
+// pedido (ej: chipá + factura), aparecen juntas en una sola fila, no una
+// fila por cada producto. La reusan tanto el buscador como el acordeón
+// de "Evolución".
+function agruparVentasPorPedido(list) {
+  const subgrupos = [];
+  const porPedido = {};
+  list.forEach(v => {
+    const clave = v.pedidoId || ('sola_' + v.id);
+    if (!porPedido[clave]) {
+      porPedido[clave] = {
+        ids: [],
+        items: [],
+        monto: 0,
+        ts: v.ts,
+        pedidoId: v.pedidoId || null
+      };
+      subgrupos.push(porPedido[clave]);
+    }
+    porPedido[clave].ids.push(v.id);
+    porPedido[clave].items.push(v);
+    porPedido[clave].monto += v.monto;
+    if (v.ts > porPedido[clave].ts) porPedido[clave].ts = v.ts;
+  });
+  return subgrupos;
+}
+
+// Convierte subgrupos (de agruparVentasPorPedido) en las filas visuales
+// de venta (ícono, nombre, hora, monto, botón de borrar).
+function renderFilasVentas(subgrupos, opts) {
+  opts = opts || {};
+  return subgrupos.map(sg => {
+    const hora = new Date(sg.ts).toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const fechaTxt = opts.mostrarFecha ? (new Date(sg.ts).toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit'
+    }) + ' · ') : '';
+    const pedidoVinculado = sg.pedidoId ? STATE.pedidos.find(p => p.id === sg.pedidoId) : null;
+    const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
+    const envioItem = sg.items.find(i => i.envio);
+    const envioTxt = envioItem ? (envioItem.envio === 'cerca' ? ' + envío cerca' : ' + envío lejos') : '';
+    const nombresTxt = sg.items.map(i => {
+      const nombreProd = STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod;
+      return i.qtyLabel ? (i.qtyLabel + ' de ' + nombreProd) : nombreProd;
+    }).join(', ');
+    // Un solo ícono representativo (el del primer producto del grupo).
+    const iconoProd = sg.items[0].prod;
+    const idsJson = JSON.stringify(sg.ids).replace(/"/g, '&quot;');
+    return `<div class="venta-item">
+      <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(iconoProd,15)}</div>
+      <div style="flex:1;"><div class="p">${nombresTxt}${envioTxt}</div><div class="t">${clienteTxt}${fechaTxt}${hora}</div></div>
+      <div class="m">${fmtMoney(sg.monto)}</div>
+      <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick='eliminarGrupoVentaUI(${idsJson})'>✕</button>
+    </div>`;
+  }).join('');
+}
+
 function renderVentas() {
+  // El total y el resumen "por producto" siguen el rango elegido arriba
+  // (Hoy / 7 días / Todo).
   let list = filtrarPorRango(STATE.ventas, rangoVentas).slice().sort((a, b) => b.ts - a.ts);
   document.getElementById('ventas-count').textContent = list.length + (list.length === 1 ? ' venta' : ' ventas');
 
@@ -1046,125 +1108,54 @@ function renderVentas() {
   });
   resumen.innerHTML = resumenHtml;
 
+  // Buscador: encuentra una venta puntual en TODO el historial, sin
+  // importar el rango elegido arriba (así "ayer" o "la semana pasada"
+  // siempre se encuentran). Para navegar día por día, se usa el
+  // acordeón de "Evolución".
   const wrap = document.getElementById('ventas-list');
   const searchEl = document.getElementById('ventas-search');
   // Sin tildes, para que buscar "maria" encuentre "María" igual.
   const sinTildes = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const term = searchEl ? sinTildes(searchEl.value.trim().toLowerCase()) : '';
-  let listFiltrada = list;
-  if (term) {
-    listFiltrada = list.filter(v => {
-      const d = new Date(v.ts);
-      const fecha1 = d.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit'
-      });
-      const fecha2 = d.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-      const envioTxt = v.envio === 'cerca' ? 'envío cerca' : v.envio === 'lejos' ? 'envío lejos' : '';
-      const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
-      const texto = sinTildes([
-        STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod,
-        v.qtyLabel || '',
-        envioTxt,
-        pedidoVinculado ? pedidoVinculado.cliente : '',
-        fecha1, fecha2,
-        String(v.monto),
-        fmtMoney(v.monto)
-      ].join(' ').toLowerCase());
-      return texto.includes(term);
-    });
-  }
-  if (listFiltrada.length === 0) {
-    wrap.innerHTML = `<div class="empty">${term ? 'No se encontraron ventas para "'+searchEl.value+'".' : 'Todavía no hay ventas registradas en este período.'}</div>`;
+
+  if (!term) {
+    wrap.innerHTML = '<div class="empty">Escribí para buscar una venta puntual (cliente, producto, monto o fecha). Para ver día por día, tocá una barra en "Evolución".</div>';
     return;
   }
 
-  // Agrupar por día: cada día es un encabezado con su total, y debajo las
-  // ventas de ese día (así no hay que mirar dos lugares distintos para
-  // "cuánto hice" y "qué vendí" en una fecha puntual).
-  const grupos = [];
-  let grupoActual = null;
-  listFiltrada.forEach(v => {
+  const resultado = STATE.ventas.slice().sort((a, b) => b.ts - a.ts).filter(v => {
     const d = new Date(v.ts);
-    const clave = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
-    if (!grupoActual || grupoActual.clave !== clave) {
-      grupoActual = {
-        clave,
-        etiqueta: d.toLocaleDateString('es-AR', {
-          weekday: 'long',
-          day: '2-digit',
-          month: '2-digit'
-        }),
-        total: 0,
-        ventas: []
-      };
-      grupos.push(grupoActual);
-    }
-    grupoActual.total += v.monto;
-    grupoActual.ventas.push(v);
+    const fecha1 = d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+    const fecha2 = d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const envioTxt = v.envio === 'cerca' ? 'envío cerca' : v.envio === 'lejos' ? 'envío lejos' : '';
+    const pedidoVinculado = v.pedidoId ? STATE.pedidos.find(p => p.id === v.pedidoId) : null;
+    const texto = sinTildes([
+      STATE.productos[v.prod] ? STATE.productos[v.prod].label : v.prod,
+      v.qtyLabel || '',
+      envioTxt,
+      pedidoVinculado ? pedidoVinculado.cliente : '',
+      fecha1, fecha2,
+      String(v.monto),
+      fmtMoney(v.monto)
+    ].join(' ').toLowerCase());
+    return texto.includes(term);
   });
 
-  wrap.innerHTML = grupos.map(g => {
-    const etiqueta = g.etiqueta.charAt(0).toUpperCase() + g.etiqueta.slice(1);
+  if (resultado.length === 0) {
+    wrap.innerHTML = `<div class="empty">No se encontraron ventas para "${searchEl.value}".</div>`;
+    return;
+  }
 
-    // Dentro de cada día, agrupar además por pedido: si un cliente compró
-    // varias cosas en el mismo pedido (ej: chipá + factura), que aparezca
-    // en una sola fila con todo junto, no una fila por cada producto.
-    const subgrupos = [];
-    const porPedido = {};
-    g.ventas.forEach(v => {
-      const clave = v.pedidoId || ('sola_' + v.id);
-      if (!porPedido[clave]) {
-        porPedido[clave] = {
-          ids: [],
-          items: [],
-          monto: 0,
-          ts: v.ts,
-          pedidoId: v.pedidoId || null
-        };
-        subgrupos.push(porPedido[clave]);
-      }
-      porPedido[clave].ids.push(v.id);
-      porPedido[clave].items.push(v);
-      porPedido[clave].monto += v.monto;
-      if (v.ts > porPedido[clave].ts) porPedido[clave].ts = v.ts;
-    });
-
-    const filasVentas = subgrupos.map(sg => {
-      const hora = new Date(sg.ts).toLocaleTimeString('es-AR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const pedidoVinculado = sg.pedidoId ? STATE.pedidos.find(p => p.id === sg.pedidoId) : null;
-      const clienteTxt = (pedidoVinculado && pedidoVinculado.cliente && pedidoVinculado.cliente.toLowerCase() !== 'sin nombre') ? (pedidoVinculado.cliente + ' · ') : '';
-      const envioItem = sg.items.find(i => i.envio);
-      const envioTxt = envioItem ? (envioItem.envio === 'cerca' ? ' + envío cerca' : ' + envío lejos') : '';
-      const nombresTxt = sg.items.map(i => {
-        const nombreProd = STATE.productos[i.prod] ? STATE.productos[i.prod].label : i.prod;
-        return i.qtyLabel ? (i.qtyLabel + ' de ' + nombreProd) : nombreProd;
-      }).join(', ');
-      // Un solo ícono representativo (el del primer producto del grupo).
-      const iconoProd = sg.items[0].prod;
-      const idsJson = JSON.stringify(sg.ids).replace(/"/g, '&quot;');
-      return `<div class="venta-item">
-        <div class="prod-icon" style="width:30px; height:30px; border-radius:8px;">${prodIconHtml(iconoProd,15)}</div>
-        <div style="flex:1;"><div class="p">${nombresTxt}${envioTxt}</div><div class="t">${clienteTxt}${hora}</div></div>
-        <div class="m">${fmtMoney(sg.monto)}</div>
-        <button class="btn btn-sm btn-ghost" style="padding:6px 10px; margin-left:8px;" onclick='eliminarGrupoVentaUI(${idsJson})'>✕</button>
-      </div>`;
-    }).join('');
-    return `<div class="historial-row">
-      <div class="historial-top">
-        <span class="historial-label">${etiqueta}</span>
-        <span class="historial-monto">${fmtMoney(g.total)}</span>
-      </div>
-      ${filasVentas}
-    </div>`;
-  }).join('');
+  const subgrupos = agruparVentasPorPedido(resultado);
+  const contadorHtml = `<div class="lbl" style="margin-bottom:8px; color:var(--text-2); font-size:12.5px;">${resultado.length} ${resultado.length === 1 ? 'resultado' : 'resultados'}</div>`;
+  wrap.innerHTML = contadorHtml + renderFilasVentas(subgrupos, { mostrarFecha: true });
 }
 
 function eliminarVentaUI(id) {
@@ -1429,10 +1420,20 @@ function renderResumen() {
 
 /* ================= HISTORIAL (por día / semana / mes) ================= */
 let periodoHistorial = 'dia';
+// Claves de los "baldes" (día/semana/mes) que el usuario tocó para
+// desplegar el detalle de ventas de ese período, tipo acordeón.
+let historialExpandido = new Set();
 
 function cambiarPeriodoHistorial(p) {
   periodoHistorial = p;
+  historialExpandido = new Set(); // al cambiar de vista, arranca todo cerrado
   document.querySelectorAll('#tab-ventas .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
+  renderHistorial();
+}
+
+function toggleHistorialRow(clave) {
+  if (historialExpandido.has(clave)) historialExpandido.delete(clave);
+  else historialExpandido.add(clave);
   renderHistorial();
 }
 
@@ -1446,10 +1447,14 @@ function claveYEtiquetaPeriodo(ts, tipo) {
       day: '2-digit',
       month: '2-digit'
     });
+    const inicio = new Date(d);
+    inicio.setHours(0, 0, 0, 0);
     return {
       clave,
       etiqueta,
-      orden: d.setHours(0, 0, 0, 0)
+      orden: inicio.getTime(),
+      inicio: inicio.getTime(),
+      fin: inicio.getTime() + 24 * 60 * 60 * 1000
     };
   }
   if (tipo === 'semana') {
@@ -1466,7 +1471,9 @@ function claveYEtiquetaPeriodo(ts, tipo) {
     return {
       clave,
       etiqueta,
-      orden: lunes.getTime()
+      orden: lunes.getTime(),
+      inicio: lunes.getTime(),
+      fin: lunes.getTime() + 7 * 24 * 60 * 60 * 1000
     };
   }
   // mes
@@ -1475,10 +1482,14 @@ function claveYEtiquetaPeriodo(ts, tipo) {
     month: 'long',
     year: 'numeric'
   });
+  const inicioMes = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+  const finMes = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
   return {
     clave,
     etiqueta,
-    orden: new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+    orden: inicioMes,
+    inicio: inicioMes,
+    fin: finMes
   };
 }
 
@@ -1488,11 +1499,16 @@ function agruparPorPeriodo(tipo) {
     const {
       clave,
       etiqueta,
-      orden
+      orden,
+      inicio,
+      fin
     } = claveYEtiquetaPeriodo(v.ts, tipo);
     if (!buckets[clave]) buckets[clave] = {
+      clave,
       etiqueta,
       orden,
+      inicio,
+      fin,
       total: 0
     };
     buckets[clave].total += v.monto;
@@ -1501,11 +1517,16 @@ function agruparPorPeriodo(tipo) {
     const {
       clave,
       etiqueta,
-      orden
+      orden,
+      inicio,
+      fin
     } = claveYEtiquetaPeriodo(m.ts, tipo);
     if (!buckets[clave]) buckets[clave] = {
+      clave,
       etiqueta,
       orden,
+      inicio,
+      fin,
       total: 0
     };
     buckets[clave].total += (m.tipo === 'ingreso' ? m.monto : -m.monto);
@@ -1525,12 +1546,29 @@ function renderHistorial() {
   wrap.innerHTML = datos.map(d => {
     const pct = Math.max(3, Math.round((Math.abs(d.total) / max) * 100));
     const etiqueta = d.etiqueta.charAt(0).toUpperCase() + d.etiqueta.slice(1);
+    const abierto = historialExpandido.has(d.clave);
+    const claveEscapada = String(d.clave).replace(/'/g, "\\'");
+
+    let detalleHtml = '';
+    if (abierto) {
+      const ventasDelPeriodo = STATE.ventas
+        .filter(v => v.ts >= d.inicio && v.ts < d.fin)
+        .sort((a, b) => b.ts - a.ts);
+      if (ventasDelPeriodo.length === 0) {
+        detalleHtml = '<div class="empty" style="padding:10px 0 2px;">No hay ventas de Doldi Chipa en este período (el total puede incluir movimientos de Remis).</div>';
+      } else {
+        const subgrupos = agruparVentasPorPedido(ventasDelPeriodo);
+        detalleHtml = renderFilasVentas(subgrupos, { mostrarFecha: periodoHistorial !== 'dia' });
+      }
+    }
+
     return `<div class="historial-row">
-      <div class="historial-top">
-        <span class="historial-label">${etiqueta}</span>
+      <div class="historial-top" onclick="toggleHistorialRow('${claveEscapada}')">
+        <span class="historial-label">${abierto ? '▾' : '▸'} ${etiqueta}</span>
         <span class="historial-monto">${fmtMoney(d.total)}</span>
       </div>
-      <div class="historial-bar-track"><div class="historial-bar-fill" style="width:${pct}%;"></div></div>
+      <div class="historial-bar-track" onclick="toggleHistorialRow('${claveEscapada}')"><div class="historial-bar-fill" style="width:${pct}%;"></div></div>
+      ${abierto ? `<div class="historial-detalle">${detalleHtml}</div>` : ''}
     </div>`;
   }).join('');
 }
