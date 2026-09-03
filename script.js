@@ -1014,11 +1014,12 @@ async function guardarPrecios() {
   renderStock();
 }
 
-let rangoVentas = 'hoy';
+let periodoVentas = 'dia';
 
-function cambiarRango(r) {
-  rangoVentas = r;
-  document.querySelectorAll('.segmented button[data-range]').forEach(b => b.classList.toggle('active', b.dataset.range === r));
+function cambiarPeriodoVentas(p) {
+  periodoVentas = p;
+  historialExpandido = new Set(); // al cambiar de período, arranca todo cerrado
+  document.querySelectorAll('#tab-ventas .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
   renderVentas();
   renderResumen();
 }
@@ -1084,12 +1085,10 @@ function renderFilasVentas(subgrupos, opts) {
 }
 
 function renderVentas() {
-  // El total y el resumen "por producto" siguen el rango elegido arriba
-  // (Hoy / 7 días / Todo).
-  let list = filtrarPorRango(STATE.ventas, rangoVentas).slice().sort((a, b) => b.ts - a.ts);
-  document.getElementById('ventas-count').textContent = list.length + (list.length === 1 ? ' venta' : ' ventas');
-
-  // Resumen agregado por producto (suma de docenas/unidades, sin separar por media/docena/docena y media)
+  // El resumen "por producto" muestra el período actual elegido arriba
+  // (Día = hoy, Semana = esta semana, Mes = este mes).
+  const rangoActual = claveYEtiquetaPeriodo(Date.now(), periodoVentas);
+  let list = STATE.ventas.filter(v => v.ts >= rangoActual.inicio && v.ts < rangoActual.fin);
   const resumen = document.getElementById('ventas-resumen');
   let resumenHtml = '<h2>Total vendido por producto</h2>';
   productosOrdenados().forEach(prod => {
@@ -1109,9 +1108,10 @@ function renderVentas() {
   resumen.innerHTML = resumenHtml;
 
   // Buscador: encuentra una venta puntual en TODO el historial, sin
-  // importar el rango elegido arriba (así "ayer" o "la semana pasada"
+  // importar el período elegido arriba (así "ayer" o "la semana pasada"
   // siempre se encuentran). Para navegar día por día, se usa el
-  // acordeón de "Evolución".
+  // acordeón de "Evolución". Si no hay texto escrito, la tarjeta de
+  // resultados se oculta para no ensuciar la pantalla.
   const wrap = document.getElementById('ventas-list');
   const searchEl = document.getElementById('ventas-search');
   // Sin tildes, para que buscar "maria" encuentre "María" igual.
@@ -1119,9 +1119,11 @@ function renderVentas() {
   const term = searchEl ? sinTildes(searchEl.value.trim().toLowerCase()) : '';
 
   if (!term) {
-    wrap.innerHTML = '<div class="empty">Escribí para buscar una venta puntual (cliente, producto, monto o fecha). Para ver día por día, tocá una barra en "Evolución".</div>';
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
     return;
   }
+  wrap.style.display = 'block';
 
   const resultado = STATE.ventas.slice().sort((a, b) => b.ts - a.ts).filter(v => {
     const d = new Date(v.ts);
@@ -1402,12 +1404,13 @@ async function confirmarAjustarCaja() {
   renderCaja();
 }
 
-/* ================= RESUMEN GENERAL (comparte el rango con Ventas) ================= */
+/* ================= RESUMEN GENERAL (comparte el período con Ventas) ================= */
 
 function renderResumen() {
-  const ventasList = filtrarPorRango(STATE.ventas, rangoVentas);
+  const rangoActual = claveYEtiquetaPeriodo(Date.now(), periodoVentas);
+  const ventasList = STATE.ventas.filter(v => v.ts >= rangoActual.inicio && v.ts < rangoActual.fin);
   const totalChipa = ventasList.reduce((s, v) => s + v.monto, 0);
-  const remisList = filtrarPorRango(STATE.remis, rangoVentas);
+  const remisList = STATE.remis.filter(m => m.ts >= rangoActual.inicio && m.ts < rangoActual.fin);
   const ingresos = remisList.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + m.monto, 0);
   const gastos = remisList.filter(m => m.tipo === 'gasto').reduce((s, m) => s + m.monto, 0);
   const netoRemis = ingresos - gastos;
@@ -1415,21 +1418,16 @@ function renderResumen() {
   document.getElementById('ventas-total').textContent = fmtMoney(total);
   document.getElementById('resumen-chipa').textContent = fmtMoney(totalChipa);
   document.getElementById('resumen-remis').textContent = fmtMoney(netoRemis);
+  const etiquetaTotal = periodoVentas === 'dia' ? 'Total de hoy' : periodoVentas === 'semana' ? 'Total de esta semana' : 'Total de este mes';
+  const totalLabelEl = document.getElementById('ventas-total-label');
+  if (totalLabelEl) totalLabelEl.textContent = etiquetaTotal + ' (Doldi Chipa + Remis)';
   renderHistorial();
 }
 
-/* ================= HISTORIAL (por día / semana / mes) ================= */
-let periodoHistorial = 'dia';
+/* ================= HISTORIAL (acordeón de Evolución) ================= */
 // Claves de los "baldes" (día/semana/mes) que el usuario tocó para
 // desplegar el detalle de ventas de ese período, tipo acordeón.
 let historialExpandido = new Set();
-
-function cambiarPeriodoHistorial(p) {
-  periodoHistorial = p;
-  historialExpandido = new Set(); // al cambiar de vista, arranca todo cerrado
-  document.querySelectorAll('#tab-ventas .segmented button[data-periodo]').forEach(b => b.classList.toggle('active', b.dataset.periodo === p));
-  renderHistorial();
-}
 
 function toggleHistorialRow(clave) {
   if (historialExpandido.has(clave)) historialExpandido.delete(clave);
@@ -1537,7 +1535,7 @@ function agruparPorPeriodo(tipo) {
 function renderHistorial() {
   const wrap = document.getElementById('historial-lista');
   if (!wrap) return;
-  const datos = agruparPorPeriodo(periodoHistorial).slice(0, 14);
+  const datos = agruparPorPeriodo(periodoVentas).slice(0, 14);
   if (datos.length === 0) {
     wrap.innerHTML = '<div class="empty">Todavía no hay ventas registradas.</div>';
     return;
@@ -1558,7 +1556,7 @@ function renderHistorial() {
         detalleHtml = '<div class="empty" style="padding:10px 0 2px;">No hay ventas de Doldi Chipa en este período (el total puede incluir movimientos de Remis).</div>';
       } else {
         const subgrupos = agruparVentasPorPedido(ventasDelPeriodo);
-        detalleHtml = renderFilasVentas(subgrupos, { mostrarFecha: periodoHistorial !== 'dia' });
+        detalleHtml = renderFilasVentas(subgrupos, { mostrarFecha: periodoVentas !== 'dia' });
       }
     }
 
