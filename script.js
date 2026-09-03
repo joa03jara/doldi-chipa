@@ -2341,48 +2341,57 @@ async function confirmarVentaInterno() {
     promesas.push(guardarCliente(clienteVentaActual.dni, datosCliente));
   }
 
-  // Guardar todo al mismo tiempo (en paralelo) en vez de uno por uno, para que sea rápido.
-  const resultados = await Promise.all(promesas);
-  const okStock = resultados[0];
-  const okResto = resultados.slice(1).every(Boolean);
+  // Actualizamos la pantalla YA MISMO, sin esperar la confirmación de
+  // Firebase (eso es lo que antes generaba ese segundo de espera). El
+  // guardado real se sigue mandando en paralelo, en segundo plano; si algo
+  // falla, se avisa más abajo con un cartel.
+  const total = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
+  cerrarModal('overlay-confirm');
+  showToast('Pedido registrado · ' + fmtMoney(total) + (premioSeleccionadoVenta ? ' · Premio aplicado: ' + premioSeleccionadoVenta.nombre : ''));
 
-  if (okStock && okResto) {
-    const total = items.reduce((s, i) => s + i.monto, 0) + envioMonto;
-    cerrarModal('overlay-confirm');
-    showToast('Pedido registrado · ' + fmtMoney(total) + (premioSeleccionadoVenta ? ' · Premio aplicado: ' + premioSeleccionadoVenta.nombre : ''));
-
-    // Dejar rastro en la libreta de pedidos (para "Completados hoy"): si esta
-    // venta venía de un pedido en espera, se marca ese mismo como listo; si
-    // fue una venta directa ("Vender ahora"), se crea un registro nuevo.
-    const registroPedido = {
-      cliente: pedidoClienteVentaAhora || 'Sin nombre',
-      items,
-      envio: envioSeleccionado,
-      estado: 'listo',
-      listoTs: tsElegido
-    };
-    if (db) {
-      if (pedidoOrigenId) {
-        db.collection('doldichipa_pedidos').doc(pedidoOrigenId).update(registroPedido).catch(() => {});
-      } else {
-        db.collection('doldichipa_pedidos').add({
-          ...registroPedido,
-          creadoTs: tsElegido
-        }).catch(() => {});
-      }
+  // Dejar rastro en la libreta de pedidos (para "Completados hoy"): si esta
+  // venta venía de un pedido en espera, se marca ese mismo como listo; si
+  // fue una venta directa ("Vender ahora"), se crea un registro nuevo.
+  const registroPedido = {
+    cliente: pedidoClienteVentaAhora || 'Sin nombre',
+    items,
+    envio: envioSeleccionado,
+    estado: 'listo',
+    listoTs: tsElegido
+  };
+  if (db) {
+    if (pedidoOrigenId) {
+      db.collection('doldichipa_pedidos').doc(pedidoOrigenId).update(registroPedido).catch(() => {});
+    } else {
+      db.collection('doldichipa_pedidos').add({
+        ...registroPedido,
+        creadoTs: tsElegido
+      }).catch(() => {});
     }
-    pedidoOrigenId = null;
-    pedidoClienteVentaAhora = '';
-
-    carrito = [];
-    envioSeleccionado = undefined;
-    clienteVentaActual = null;
-    premioSeleccionadoVenta = null;
   }
+  pedidoOrigenId = null;
+  pedidoClienteVentaAhora = '';
+
+  carrito = [];
+  envioSeleccionado = undefined;
+  clienteVentaActual = null;
+  premioSeleccionadoVenta = null;
+
   renderStock();
   renderVentas();
   renderCaja();
   renderPedidos();
+
+  // Recién ahora esperamos que las escrituras terminen de viajar a Firebase,
+  // pero ya en segundo plano (el usuario no lo ve). Si alguna falla de
+  // verdad (por ejemplo, se cortó internet en ese instante), avisamos.
+  Promise.all(promesas).then(resultados => {
+    const okStock = resultados[0];
+    const okResto = resultados.slice(1).every(Boolean);
+    if (!okStock || !okResto) {
+      showToast('⚠️ Este pedido no llegó a guardarse bien en la nube, revisalo');
+    }
+  });
 }
 
 /* ================= CARGA FLOW ================= */
